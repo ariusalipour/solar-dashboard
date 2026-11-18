@@ -11,6 +11,7 @@ A private home energy dashboard for the official FoxESS Cloud Open API. Runs as 
 - Overnight schedules and UK daylight-saving time (`Europe/London`).
 - Separate import cost, export credit, standing charge and net cost, with explicit data coverage.
 - Password-protected household access, secure session cookies on HTTPS, same-origin request protection, and server-side cloud credentials.
+- Light, dark and system themes, remembered per browser and applied before the page renders. The Theme selector is available in navigation and on the sign-in screen.
 
 ## Using the dashboard
 

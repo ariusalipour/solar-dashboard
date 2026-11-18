@@ -8,6 +8,7 @@
     />
     <meta name="theme-color" content="#ffffff" />
     <title>Solar — Overview</title>
+    <script src="/static/theme.js"></script>
     <link rel="stylesheet" href="/static/style.css" />
     <script src="/static/app.js" defer></script>
   </head>
@@ -60,6 +61,18 @@
 
     <section id="login-view" class="login-view" hidden>
       <form id="login-form" class="login-card">
+        <div class="theme-picker login-theme-picker">
+          <label for="login-theme-select">Theme</label>
+          <select
+            id="login-theme-select"
+            class="theme-select"
+            data-theme-select
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
         <div class="login-brand">
           <svg class="icon"><use href="#i-sun" /></svg> Solar
         </div>
@@ -95,6 +108,14 @@
           >
         </nav>
         <div class="sidebar-bottom">
+          <div class="theme-picker">
+            <label for="theme-select">Theme</label>
+            <select id="theme-select" class="theme-select" data-theme-select>
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
           <span class="private-badge">Private dashboard</span
           ><button id="logout" class="nav-logout">
             <svg class="icon"><use href="#i-logout" /></svg>Sign out
@@ -282,7 +303,7 @@
                     <svg
                       id="energy-chart"
                       viewBox="0 0 900 280"
-                  role="group"
+                      role="group"
                       aria-labelledby="chart-title chart-desc"
                     >
                       <title id="chart-title">Power over time</title>
