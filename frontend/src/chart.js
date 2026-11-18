@@ -109,4 +109,11 @@ function nearest(points, target, tolerance = 900000, coordinate = "time") {
   return distance <= tolerance ? result : null;
 }
 
-export { localParts, daysBetween, prepare, nearest };
+// A calendar date owns its colour, independent of the displayed range or order.
+function dayColor(day) {
+  const ordinal = Math.floor(Date.parse(`${day}T12:00:00Z`) / 86400000);
+  const hue = (((ordinal * 137.508) % 360) + 360) % 360;
+  return `light-dark(hsl(${hue.toFixed(3)} 68% 36%), hsl(${hue.toFixed(3)} 74% 70%))`;
+}
+
+export { localParts, daysBetween, prepare, nearest, dayColor };

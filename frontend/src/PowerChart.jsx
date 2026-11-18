@@ -1,6 +1,8 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
+import { Selector } from "@astryxdesign/core/Selector";
+import { DateRangeInput } from "@astryxdesign/core/DateRangeInput";
 import {
   SegmentedControl,
   SegmentedControlItem,
@@ -67,10 +69,6 @@ const stamp = (time) =>
   }).format(new Date(time));
 const clock = (value) =>
   `${String(Math.floor(value / 3600)).padStart(2, "0")}:${String(Math.floor((value % 3600) / 60)).padStart(2, "0")}`;
-const pattern = (index) =>
-  index === 0
-    ? ""
-    : `${3 + (index % 5)} ${2 + Math.floor(index / 5)} ${1 + (index % 3)} ${2 + Math.floor(index / 3)}`;
 function preferences() {
   try {
     const p = JSON.parse(localStorage.getItem("solar-chart") || "{}");
@@ -80,10 +78,15 @@ function preferences() {
   }
 }
 
-export default function PowerChart({ data, onCompareRequest }) {
+export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
   const [prefs] = useState(preferences);
   const [mode, setMode] = useState(
     prefs.mode === "compare" ? "compare" : "timeline",
+  );
+  const [compareMetric, setCompareMetric] = useState(
+    fields.some((field) => field.key === prefs.compareMetric)
+      ? prefs.compareMetric
+      : "pvPower",
   );
   const [visible, setVisible] = useState(
     () =>
@@ -102,10 +105,10 @@ export default function PowerChart({ data, onCompareRequest }) {
     try {
       localStorage.setItem(
         "solar-chart",
-        JSON.stringify({ mode, series: [...visible] }),
+        JSON.stringify({ mode, series: [...visible], compareMetric }),
       );
     } catch {}
-  }, [mode, visible]);
+  }, [mode, visible, compareMetric]);
   useEffect(() => {
     const observer = new ResizeObserver((entries) =>
       setWidth(Math.max(240, Math.min(900, entries[0].contentRect.width))),
@@ -123,6 +126,7 @@ export default function PowerChart({ data, onCompareRequest }) {
     const found = new Set();
     for (const packet of series)
       for (const field of fields) {
+        if (mode === "compare" && field.key !== compareMetric) continue;
         if (
           typeof packet.values?.[field.key] !== "number" ||
           !Number.isFinite(packet.values[field.key])
@@ -132,16 +136,12 @@ export default function PowerChart({ data, onCompareRequest }) {
         if (Number.isFinite(time)) found.add(SolarChart.localParts(time).day);
       }
     return found;
-  }, [series]);
-  const latest = days.filter((day) => populated.has(day)).slice(-3);
-  const selectedDays =
-    selection.range === range
-      ? selection.days
-      : latest.length
-        ? latest
-        : days.slice(-3);
+  }, [series, mode, compareMetric]);
+  const selectedDays = selection.range === range ? selection.days : days;
   const compare = mode === "compare",
-    activeFields = fields.filter((f) => visible.has(f.toggle));
+    activeFields = fields.filter((f) =>
+      compare ? f.key === compareMetric : visible.has(f.toggle),
+    );
   const start = Date.parse(data?.chart_start),
     end = Date.parse(data?.chart_end);
   const tracks = useMemo(
@@ -152,7 +152,7 @@ export default function PowerChart({ data, onCompareRequest }) {
         end,
         days: selectedDays,
       }),
-    [series, mode, start, end, visible, selectedDays.join(",")],
+    [series, mode, start, end, visible, compareMetric, selectedDays.join(",")],
   );
   const points = tracks.flatMap((t) => t.points),
     ready = points.length >= 2;
@@ -253,7 +253,7 @@ export default function PowerChart({ data, onCompareRequest }) {
           <h2>Power usage</h2>
           <p>
             {compare
-              ? "Compare days on the same UK local clock."
+              ? "Each colour is a date, aligned to the same UK local clock."
               : "Power across your selected dates."}
           </p>
         </div>
@@ -271,44 +271,65 @@ export default function PowerChart({ data, onCompareRequest }) {
           <SegmentedControlItem value="compare" label="Compare days" />
         </SegmentedControl>
       </div>
-      <div className="power-chart-metrics" aria-label="Chart metrics">
-        {metrics.map((metric) => (
-          <div key={metric.toggle} className="power-chart-metric">
-            <span
-              className="power-chart-swatch"
-              style={{ background: metric.color }}
-            />
-            <CheckboxInput
-              label={metric.label}
-              value={visible.has(metric.toggle)}
-              onChange={(checked) => {
-                setVisible((previous) => {
-                  const next = new Set(previous);
-                  checked
-                    ? next.add(metric.toggle)
-                    : next.delete(metric.toggle);
-                  return next;
-                });
+      {compare ? (
+        <div className="power-chart-comparison-controls">
+          <DateRangeInput
+            label="Comparison dates"
+            value={{ start: data.start, end: data.end }}
+            onChange={(next) => {
+              if (next) onRangeChange?.(next);
+            }}
+            hasClear={false}
+            maxRangeSpan={31}
+            description="Costs and totals use the same dates."
+          />
+          <Selector
+            label="Measurement"
+            value={compareMetric}
+            options={fields.map((field) => ({
+              value: field.key,
+              label: field.label,
+            }))}
+            onChange={(next) => {
+              if (fields.some((field) => field.key === next)) {
+                setCompareMetric(next);
                 setPosition(null);
-              }}
-            />
-          </div>
-        ))}
-      </div>
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <div className="power-chart-metrics" aria-label="Chart metrics">
+          {metrics.map((metric) => (
+            <div key={metric.toggle} className="power-chart-metric">
+              <span
+                className="power-chart-swatch"
+                style={{ background: metric.color }}
+              />
+              <CheckboxInput
+                label={metric.label}
+                value={visible.has(metric.toggle)}
+                onChange={(checked) => {
+                  setVisible((previous) => {
+                    const next = new Set(previous);
+                    checked
+                      ? next.add(metric.toggle)
+                      : next.delete(metric.toggle);
+                    return next;
+                  });
+                  setPosition(null);
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
       {compare && (
         <div className="power-chart-days">
           <div className="power-chart-day-actions">
             <span>
               {selectedDays.length} of {days.length} days selected
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              label="Latest 3"
-              onClick={() =>
-                chooseDays(latest.length ? latest : days.slice(-3))
-              }
-            />
             <Button
               variant="ghost"
               size="sm"
@@ -323,17 +344,13 @@ export default function PowerChart({ data, onCompareRequest }) {
             />
           </div>
           <div className="power-chart-day-list">
-            {days.map((day, i) => (
+            {days.map((day) => (
               <div className="power-chart-day" key={day}>
-                <svg viewBox="0 0 30 10" aria-hidden="true">
-                  <line
-                    x1="0"
-                    y1="5"
-                    x2="30"
-                    y2="5"
-                    strokeDasharray={pattern(i)}
-                  />
-                </svg>
+                <span
+                  className="power-chart-day-swatch"
+                  style={{ background: SolarChart.dayColor(day) }}
+                  aria-hidden="true"
+                />
                 <CheckboxInput
                   label={`${dateLabel(day)}${populated.has(day) ? "" : " · No readings"}`}
                   value={selectedDays.includes(day)}
@@ -350,7 +367,7 @@ export default function PowerChart({ data, onCompareRequest }) {
           </div>
         </div>
       )}
-      {visible.has("battery") && (
+      {!compare && visible.has("battery") && (
         <p className="power-chart-battery-key">
           <span>Battery charge</span>
           <span>Battery discharge · dashed</span>
@@ -369,9 +386,12 @@ export default function PowerChart({ data, onCompareRequest }) {
                 : "Power over the selected period"}
             </title>
             <desc id={`${id}-desc`}>
-              Power in kilowatts. Colours identify metrics and patterns identify
-              days. Gaps remain empty. Use arrow keys to inspect, Home and End
-              to jump.
+              Power in kilowatts.{" "}
+              {compare
+                ? "Colours identify dates for the selected measurement."
+                : "Colours identify metrics."}
+              Gaps remain empty. Use arrow keys to inspect, Home and End to
+              jump.
             </desc>
             {Array.from({ length: 5 }, (_, i) => {
               const value = (limit * i) / 4;
@@ -426,9 +446,11 @@ export default function PowerChart({ data, onCompareRequest }) {
             })}
             {tracks.flatMap((track, ti) =>
               track.segments.map((segment, si) => {
-                const dash = compare
-                  ? pattern(days.indexOf(track.day))
-                  : track.field.key === "batDischargePower"
+                const color = compare
+                  ? SolarChart.dayColor(track.day)
+                  : track.field.color;
+                const dash =
+                  !compare && track.field.key === "batDischargePower"
                     ? "5 3"
                     : "";
                 return segment.length === 1 ? (
@@ -437,18 +459,14 @@ export default function PowerChart({ data, onCompareRequest }) {
                     cx={x(segment[0].x)}
                     cy={y(segment[0].value)}
                     r="2"
-                    fill={track.field.color}
+                    fill={color}
                   />
                 ) : (
                   <path
                     key={`${ti}/${si}`}
                     className="power-chart-line"
-                    stroke={track.field.color}
-                    strokeDasharray={
-                      track.field.key === "batDischargePower" && compare
-                        ? `${dash || "10 3"} 2 3`
-                        : dash
-                    }
+                    stroke={color}
+                    strokeDasharray={dash}
                     d={segment
                       .map(
                         (p, i) =>
@@ -538,7 +556,13 @@ export default function PowerChart({ data, onCompareRequest }) {
                   </strong>
                   {group.values.map(({ field, point }) => (
                     <span key={field.key}>
-                      <i style={{ background: field.color }} />
+                      <i
+                        style={{
+                          background: compare
+                            ? SolarChart.dayColor(group.day)
+                            : field.color,
+                        }}
+                      />
                       {field.label}{" "}
                       {point ? `${point.value.toFixed(2)} kW` : "—"}{" "}
                       <small>

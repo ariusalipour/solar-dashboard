@@ -14,6 +14,14 @@ const range = {
   days: ["2026-11-16", "2026-11-17"],
 };
 
+test("date colours remain stable across overlapping ranges and distinguish a full month", () => {
+  const month = chart.daysBetween("2026-10-20", "2026-11-19");
+  const overlap = chart.daysBetween("2026-11-01", "2026-11-07");
+  const colours = new Map(month.map((day) => [day, chart.dayColor(day)]));
+  assert.equal(new Set(colours.values()).size, 31);
+  for (const day of overlap) assert.equal(chart.dayColor(day), colours.get(day));
+});
+
 test("daily overlays align UK clock time while retaining date and metric identity", () => {
   const tracks = chart.prepare(
     [

@@ -683,6 +683,7 @@ export default function App() {
                       <PowerChart
                         data={report}
                         onCompareRequest={() => choosePeriod("week")}
+                        onRangeChange={chooseDates}
                       />
                       <Coverage data={report} />
                     </div>
