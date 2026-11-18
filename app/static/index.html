@@ -77,7 +77,7 @@
         <div class="login-brand">
           <svg class="icon"><use href="#i-sun" /></svg> Solar
         </div>
-        <div id="password-signin">
+        <div id="password-signin" hidden>
           <h1>Sign in</h1>
           <p>Enter the household password to access your energy data.</p>
           <label for="password">Household password</label
@@ -95,6 +95,11 @@
           <a class="button primary full" href="/cdn-cgi/access/login"
             >Continue with Cloudflare Access</a
           >
+        </div>
+        <div id="session-retry" hidden>
+          <h1>Unable to open the dashboard</h1>
+          <p>Try again to check your sign-in and load your readings.</p>
+          <a class="button primary full" href="/">Try again</a>
         </div>
         <p id="login-error" class="form-message" role="alert"></p>
       </form>

@@ -11,7 +11,7 @@ const state = {
   editing: null,
   page: "overview",
   authenticated: false,
-  authMode: "password",
+  authMode: null,
   chartIndex: null,
 };
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
@@ -115,9 +115,10 @@ async function api(url, body, method = "POST") {
 function showLogin() {
   state.authenticated = false;
   const access = state.authMode === "cloudflare";
-  $("password-signin").hidden = access;
+  $("password-signin").hidden = state.authMode !== "password";
   $("access-signin").hidden = !access;
-  $("password").disabled = access;
+  $("session-retry").hidden = state.authMode !== null;
+  $("password").disabled = state.authMode !== "password";
   $("login-view").hidden = false;
   $("app-view").hidden = true;
 }

@@ -1273,7 +1273,8 @@ input[readonly] {
 }
 .login-card > p,
 #password-signin > p,
-#access-signin > p {
+#access-signin > p,
+#session-retry > p {
   font-size: 12px;
   margin: 8px 0 24px;
   line-height: 1.7;
