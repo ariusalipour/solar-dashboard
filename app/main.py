@@ -269,6 +269,7 @@ def create_app(store=None, collect=True):
                 'interval_count': sum(1 for i in intervals if parse_time(i['end']) > begin and parse_time(i['start']) < finish),
                 'first_sample_at': store.first_sample_at(),
                 'series': [s for s in samples if utc_string(begin) <= s['time'] < utc_string(finish)],
+                'chart_series': store.chart_series(utc_string(begin), utc_string(finish)),
                 'collector': store.get('collector', {}), 'connected': bool(store.get('fox', {}).get('sn')),
                 'calls_today': store.call_count(utc_string(datetime.now(timezone.utc) - timedelta(hours=24))),
                 'tariff_configured': bool(store.tariffs())}

@@ -147,7 +147,7 @@ async function startDashboard() {
   showApp();
   try {
     await loadSettings();
-    setPeriod("today");
+    setPeriod(state.chartMode === "compare" ? "week" : "today");
     $("page-error").hidden = true;
   } catch (error) {
     if (state.authenticated) pageError(error);
@@ -179,6 +179,8 @@ function showPage() {
   text("page-subtitle", titles[state.page][1]);
   document.title = `Solar — ${titles[state.page][0]}`;
   $("custom-dates").open = false;
+  if (state.page === "overview" && state.data)
+    requestAnimationFrame(() => renderChart(state.data));
 }
 window.addEventListener("hashchange", () => {
   if (location.hash === "#main") {
@@ -622,21 +624,166 @@ function renderDashboard(data) {
   renderChart(data);
 }
 const chartFields = [
-  { key: "pvPower", label: "Solar", css: "solar-line" },
-  { key: "loadsPower", label: "Home", css: "home-line" },
-  { key: "gridConsumptionPower", label: "Import", css: "grid-line" },
-  { key: "feedinPower", label: "Export", css: "export-line" },
+  { key: "pvPower", label: "Solar", css: "solar-line", toggle: "pvPower" },
+  { key: "loadsPower", label: "Home", css: "home-line", toggle: "loadsPower" },
+  {
+    key: "gridConsumptionPower",
+    label: "Import",
+    css: "grid-line",
+    toggle: "gridConsumptionPower",
+  },
+  {
+    key: "feedinPower",
+    label: "Export",
+    css: "export-line",
+    toggle: "feedinPower",
+  },
+  {
+    key: "batChargePower",
+    label: "Battery charge",
+    css: "battery-charge-line",
+    toggle: "battery",
+  },
+  {
+    key: "batDischargePower",
+    label: "Battery discharge",
+    css: "battery-discharge-line",
+    toggle: "battery",
+  },
 ];
+let chartPreferences = {};
+try {
+  chartPreferences = JSON.parse(localStorage.getItem("solar-chart") || "{}");
+  if (!chartPreferences || typeof chartPreferences !== "object")
+    chartPreferences = {};
+} catch {}
+state.chartMode = chartPreferences.mode === "compare" ? "compare" : "timeline";
+state.comparisonDays = null;
+state.comparisonRange = "";
+state.chartPosition = null;
+if (Array.isArray(chartPreferences.series))
+  document
+    .querySelectorAll("[data-series]")
+    .forEach(
+      (input) =>
+        (input.checked = chartPreferences.series.includes(
+          input.dataset.series,
+        )),
+    );
+function saveChartPreferences() {
+  try {
+    localStorage.setItem(
+      "solar-chart",
+      JSON.stringify({
+        mode: state.chartMode,
+        series: [...document.querySelectorAll("[data-series]:checked")].map(
+          (input) => input.dataset.series,
+        ),
+      }),
+    );
+  } catch {}
+}
+function dayPattern(index) {
+  return index === 0
+    ? ""
+    : `${3 + (index % 5)} ${2 + Math.floor(index / 5)} ${1 + (index % 3)} ${2 + Math.floor(index / 3)}`;
+}
+function updateComparisonDays(data) {
+  const range = `${data.start}/${data.end}`;
+  const days = SolarChart.daysBetween(data.start, data.end);
+  const populatedDays = new Set();
+  for (const packet of data.chart_series || data.series || [])
+    for (const field of chartFields) {
+      if (!finite(packet.values?.[field.key])) continue;
+      const time = Date.parse(packet.times?.[field.key] || packet.time);
+      if (finite(time)) populatedDays.add(SolarChart.localParts(time).day);
+    }
+  if (state.comparisonRange !== range) {
+    state.comparisonRange = range;
+    const available = days.filter((day) => populatedDays.has(day));
+    state.comparisonDays = new Set(
+      (available.length ? available : days).slice(-3),
+    );
+    const host = $("day-options");
+    host.replaceChildren();
+    days.forEach((day, index) => {
+      const label = document.createElement("label"),
+        input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = day;
+      input.checked = state.comparisonDays.has(day);
+      const sample = svgNode("svg", {
+        viewBox: "0 0 30 10",
+        "aria-hidden": "true",
+        class: "day-pattern",
+      });
+      sample.append(
+        svgNode("line", {
+          x1: 0,
+          y1: 5,
+          x2: 30,
+          y2: 5,
+          "stroke-dasharray": dayPattern(index),
+        }),
+      );
+      const name = document.createElement("span");
+      name.textContent = `${dateLabel(day)}${populatedDays.has(day) ? "" : " · No readings"}`;
+      label.append(input, sample, name);
+      host.append(label);
+      input.addEventListener("change", () => {
+        if (input.checked) state.comparisonDays.add(day);
+        else state.comparisonDays.delete(day);
+        state.chartPosition = null;
+        renderChart(state.data);
+      });
+    });
+  }
+  $("day-options")
+    .querySelectorAll("label")
+    .forEach((label) => {
+      const day = label.querySelector("input").value;
+      label.querySelector("span").textContent =
+        `${dateLabel(day)}${populatedDays.has(day) ? "" : " · No readings"}`;
+    });
+  $("comparison-days").hidden = state.chartMode !== "compare";
+  return days;
+}
 function renderChart(data) {
+  if (!data) return;
   const svg = $("energy-chart");
-  const hadFocus = svg.contains(document.activeElement);
-  const previousTime = state.chartTime;
+  const chartWidth = Math.max(
+    240,
+    Math.min(900, svg.clientWidth || state.chartWidth || 900),
+  );
+  state.chartWidth = chartWidth;
+  svg.setAttribute("viewBox", `0 0 ${chartWidth} 280`);
+  const hadFocus = svg.contains(document.activeElement),
+    compare = state.chartMode === "compare";
+  const days = updateComparisonDays(data);
+  document
+    .querySelectorAll("[data-chart-mode]")
+    .forEach((button) =>
+      button.setAttribute(
+        "aria-pressed",
+        String(button.dataset.chartMode === state.chartMode),
+      ),
+    );
+  text(
+    "chart-mode-hint",
+    compare
+      ? "Overlay selected days on the same UK local clock. Choose a wider date range for more days."
+      : "Power across your selected dates.",
+  );
   svg.replaceChildren(
-    svgNode("title", { id: "chart-title" }, "Power over the selected period"),
+    svgNode(
+      "title",
+      { id: "chart-title" },
+      compare ? "Daily power comparison" : "Power over the selected period",
+    ),
     svgNode(
       "desc",
       { id: "chart-desc" },
-      "Solar, home consumption, grid import and export in kilowatts. Missing readings appear as gaps. Use the arrow keys to inspect readings.",
+      "Power in kilowatts. Colors identify metrics; line patterns identify days. Battery charge and discharge are separate readings. Gaps remain empty. Use arrow keys to inspect, Home and End to jump.",
     ),
   );
   const visible = new Set(
@@ -644,65 +791,68 @@ function renderChart(data) {
       (input) => input.dataset.series,
     ),
   );
-  const fields = chartFields.filter((field) => visible.has(field.key));
-  const series = (data.series || []).filter((sample) =>
-    finite(Date.parse(sample.time)),
-  );
+  const fields = chartFields.filter((field) => visible.has(field.toggle));
+  $("battery-key").hidden = !visible.has("battery");
+  const series = data.chart_series || data.series || [],
+    start = Date.parse(data.chart_start),
+    end = Date.parse(data.chart_end);
+  const tracks = SolarChart.prepare(series, fields, {
+    mode: state.chartMode,
+    start,
+    end,
+    days: [...state.comparisonDays],
+  });
+  const points = tracks.flatMap((track) => track.points);
+  const ready = points.length >= 2;
+  const selectedDays = days.filter((day) => state.comparisonDays.has(day));
   text(
     "chart-sample-count",
-    `${series.length} ${series.length === 1 ? "reading" : "readings"}`,
+    compare
+      ? `${selectedDays.length} of ${days.length} days selected`
+      : `${series.length} readings`,
   );
-  const usable = series.filter((sample) =>
-    fields.some((field) => finite(sample.values?.[field.key])),
-  );
-  const ready = usable.length >= 2;
   $("chart-empty").hidden = ready;
   if (!ready) {
-    const noFields = fields.length === 0,
-      hasAny = series.length > 0,
-      isBeforeCollection =
-        data.first_sample_at &&
-        Date.parse(data.chart_end) <= Date.parse(data.first_sample_at);
+    const noFields = !fields.length,
+      noDays = compare && !selectedDays.length;
     text(
       "chart-empty-title",
       noFields
         ? "Choose a series"
-        : hasAny
-          ? "Waiting for more readings"
-          : "No readings for this period",
+        : noDays
+          ? "Choose days to compare"
+          : points.length
+            ? "Waiting for more readings"
+            : "No readings for this selection",
     );
     text(
       "chart-empty-text",
       noFields
-        ? "Select Solar, Home, Import or Export above the chart."
-        : hasAny
-          ? "The chart needs two readings with power values. FoxESS is checked every five minutes."
-          : isBeforeCollection
-            ? `Collection started ${stamp(data.first_sample_at)}. Earlier FoxESS history has not been imported.`
+        ? "Select Solar, Home, Import, Export or Battery above the chart."
+        : noDays
+          ? "Select at least one day above the chart."
+          : series.length && !points.length
+            ? "No values are available for the selected metrics and days. Try another metric or date range."
             : data.end < localDate()
               ? "No readings were stored for these dates. Earlier FoxESS history has not been imported."
-              : "New readings will appear here after the next collection.",
+              : data.first_sample_at
+                ? `Collection started ${stamp(data.first_sample_at)}. FoxESS is checked every five minutes.`
+                : "Readings will appear after collection. FoxESS is checked every five minutes.",
     );
-    $("show-today").hidden = noFields || state.period === "today";
+    $("show-today").hidden = noFields || noDays || state.period === "today";
     text("chart-detail", "");
     return;
   }
-  const start = Date.parse(data.chart_start),
-    end = Date.parse(data.chart_end);
-  const bounds = { left: 42, right: 885, top: 15, bottom: 235 };
-  const limit = Math.max(
-    0.5,
-    Math.ceil(
-      Math.max(
-        ...usable.flatMap((sample) =>
-          fields.map((field) => Math.max(0, sample.values?.[field.key] || 0)),
-        ),
-      ) * 2,
-    ) / 2,
-  );
-  const x = (time) =>
-      bounds.left +
-      ((time - start) / (end - start)) * (bounds.right - bounds.left),
+  const bounds = { left: 42, right: chartWidth - 15, top: 15, bottom: 235 },
+    axisStart = compare ? 0 : start,
+    axisEnd = compare ? 86400 : end;
+  const x = (position) =>
+    bounds.left +
+    ((position - axisStart) / (axisEnd - axisStart)) *
+      (bounds.right - bounds.left);
+  let maximum = 0.5;
+  for (const point of points) maximum = Math.max(maximum, point.value);
+  const limit = Math.ceil(maximum * 2) / 2,
     y = (value) =>
       bounds.bottom - (value / limit) * (bounds.bottom - bounds.top);
   for (let i = 0; i <= 4; i++) {
@@ -728,19 +878,21 @@ function renderChart(data) {
     );
   }
   for (let i = 0; i <= 4; i++) {
-    const time = start + ((end - start) * i) / 4;
-    let label = new Intl.DateTimeFormat("en-GB", {
-      timeZone: zone,
-      ...(data.start === data.end
-        ? { hour: "2-digit", minute: "2-digit" }
-        : { day: "numeric", month: "short" }),
-    }).format(new Date(time));
-    if (data.start === data.end && i === 4) label = "24:00";
+    const position = axisStart + ((axisEnd - axisStart) * i) / 4;
+    let label = compare
+      ? `${String(i * 6).padStart(2, "0")}:00`
+      : new Intl.DateTimeFormat("en-GB", {
+          timeZone: zone,
+          ...(data.start === data.end
+            ? { hour: "2-digit", minute: "2-digit" }
+            : { day: "numeric", month: "short" }),
+        }).format(new Date(position));
+    if (!compare && data.start === data.end && i === 4) label = "24:00";
     svg.append(
       svgNode(
         "text",
         {
-          x: x(time),
+          x: x(position),
           y: 265,
           "text-anchor": i === 0 ? "start" : i === 4 ? "end" : "middle",
           class: "chart-axis-label",
@@ -749,22 +901,40 @@ function renderChart(data) {
       ),
     );
   }
-  fields.forEach((field) => {
-    let path = "",
-      last = null;
-    series.forEach((sample) => {
-      const value = sample.values?.[field.key],
-        time = Date.parse(sample.times?.[field.key] || sample.time);
-      if (!finite(value) || !finite(time) || time < start || time > end) {
-        last = null;
-        return;
-      }
-      const move = last === null || time - last > 900000 || time <= last;
-      path += `${move ? "M" : "L"}${x(time).toFixed(2)},${y(value).toFixed(2)} `;
-      last = time;
+  tracks.forEach((track) => {
+    const pattern = compare
+      ? dayPattern(days.indexOf(track.day))
+      : track.field.key === "batDischargePower"
+        ? "5 3"
+        : "";
+    track.segments.forEach((segment) => {
+      const path = segment
+        .map(
+          (point, index) =>
+            `${index ? "L" : "M"}${x(point.x).toFixed(2)},${y(point.value).toFixed(2)}`,
+        )
+        .join(" ");
+      if (segment.length === 1)
+        svg.append(
+          svgNode("circle", {
+            cx: x(segment[0].x),
+            cy: y(segment[0].value),
+            r: 2,
+            class: `plot-point ${track.field.css}`,
+          }),
+        );
+      else
+        svg.append(
+          svgNode("path", {
+            d: path,
+            class: `plot-line ${track.field.css}`,
+            "stroke-dasharray":
+              track.field.key === "batDischargePower" && compare
+                ? `${pattern || "10 3"} 2 3`
+                : pattern,
+          }),
+        );
     });
-    if (path)
-      svg.append(svgNode("path", { d: path, class: `plot-line ${field.css}` }));
   });
   const cursor = svgNode("line", {
     x1: bounds.left,
@@ -775,6 +945,10 @@ function renderChart(data) {
     visibility: "hidden",
   });
   svg.append(cursor);
+  const positions = compare
+    ? Array.from({ length: 289 }, (_, i) => i * 300)
+    : [...new Set(points.map((point) => point.time))].sort((a, b) => a - b);
+  let index = 0;
   const hit = svgNode("rect", {
     x: bounds.left,
     y: bounds.top,
@@ -783,76 +957,156 @@ function renderChart(data) {
     class: "chart-hit",
     tabindex: 0,
     role: "slider",
-    "aria-label": "Inspect power readings",
+    "aria-label": compare
+      ? "Inspect the same time across selected days"
+      : "Inspect power readings",
     "aria-valuemin": 0,
-    "aria-valuemax": series.length - 1,
+    "aria-valuemax": positions.length - 1,
     "aria-valuenow": 0,
+    "aria-valuetext": "Use arrow keys to inspect readings",
   });
   svg.append(hit);
-  let index = 0;
   function inspect(next) {
-    index = Math.max(0, Math.min(series.length - 1, next));
-    const sample = series[index];
-    state.chartTime = sample.time;
-    const lineX = x(Date.parse(sample.time));
-    cursor.setAttribute("x1", lineX);
-    cursor.setAttribute("x2", lineX);
+    index = Math.max(0, Math.min(positions.length - 1, next));
+    const position = positions[index];
+    state.chartPosition = position;
+    cursor.setAttribute("x1", x(position));
+    cursor.setAttribute("x2", x(position));
     cursor.setAttribute("visibility", "visible");
     hit.setAttribute("aria-valuenow", index);
-    const detail = $("chart-detail");
+    const descriptions = [],
+      detail = $("chart-detail");
     detail.replaceChildren();
-    const descriptions = [
-      stamp(sample.time),
-      ...fields.map(
-        (field) => `${field.label} ${kw(sample.values?.[field.key])}`,
-      ),
-    ];
-    descriptions.forEach((value) => {
-      const span = document.createElement("span");
-      span.textContent = value;
-      detail.append(span);
+    const heading = document.createElement("strong");
+    heading.textContent = compare
+      ? `${String(Math.floor(position / 3600)).padStart(2, "0")}:${String(Math.floor((position % 3600) / 60)).padStart(2, "0")} · UK local time`
+      : stamp(new Date(position).toISOString());
+    detail.append(heading);
+    descriptions.push(heading.textContent);
+    const groups = compare ? selectedDays : [null];
+    groups.forEach((day) => {
+      const row = document.createElement("div");
+      row.className = "chart-reading-row";
+      const label = document.createElement("strong");
+      label.textContent = day ? dateLabel(day) : "Readings";
+      row.append(label);
+      const parts = [label.textContent];
+      fields.forEach((field) => {
+        const track = tracks.find(
+          (track) => track.field.key === field.key && track.day === day,
+        );
+        const point = SolarChart.nearest(
+          track?.points || [],
+          position,
+          compare ? 450 : 450000,
+          compare ? "x" : "time",
+        );
+        const value = document.createElement("span");
+        // Show the source time, including BST/GMT, so nearest readings and repeated DST hours are explicit.
+        const source = point
+          ? new Intl.DateTimeFormat("en-GB", {
+              timeZone: zone,
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZoneName: "short",
+            }).format(new Date(point.time))
+          : "no nearby reading";
+        value.textContent = `${field.label} ${kw(point?.value)} (${source})`;
+        row.append(value);
+        parts.push(value.textContent);
+      });
+      detail.append(row);
+      descriptions.push(parts.join(" · "));
     });
-    hit.setAttribute("aria-valuetext", descriptions.join(" · "));
+    hit.setAttribute("aria-valuetext", descriptions.join("; "));
+  }
+  function nearestIndex(position) {
+    let found = 0,
+      distance = Infinity;
+    positions.forEach((value, i) => {
+      const delta = Math.abs(value - position);
+      if (delta < distance) {
+        distance = delta;
+        found = i;
+      }
+    });
+    return found;
   }
   function inspectPointer(event) {
     const rect = svg.getBoundingClientRect(),
-      point = ((event.clientX - rect.left) / rect.width) * 900,
-      time =
-        start +
-        ((point - bounds.left) / (bounds.right - bounds.left)) * (end - start);
-    let closest = 0,
-      distance = Infinity;
-    series.forEach((sample, i) => {
-      const delta = Math.abs(Date.parse(sample.time) - time);
-      if (delta < distance) {
-        distance = delta;
-        closest = i;
-      }
-    });
-    inspect(closest);
+      point = ((event.clientX - rect.left) / rect.width) * chartWidth;
+    inspect(
+      nearestIndex(
+        axisStart +
+          ((point - bounds.left) / (bounds.right - bounds.left)) *
+            (axisEnd - axisStart),
+      ),
+    );
   }
   hit.addEventListener("pointermove", inspectPointer);
   hit.addEventListener("pointerdown", inspectPointer);
   hit.addEventListener("focus", () => inspect(index));
   hit.addEventListener("keydown", (event) => {
-    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+    if (
+      [
+        "ArrowLeft",
+        "ArrowRight",
+        "ArrowUp",
+        "ArrowDown",
+        "Home",
+        "End",
+      ].includes(event.key)
+    ) {
       event.preventDefault();
       inspect(
         event.key === "Home"
           ? 0
           : event.key === "End"
-            ? series.length - 1
-            : index + (event.key === "ArrowRight" ? 1 : -1),
+            ? positions.length - 1
+            : index + (["ArrowRight", "ArrowUp"].includes(event.key) ? 1 : -1),
       );
     }
   });
-  text("chart-detail", "Select a point on the chart to inspect a reading.");
-  const previousIndex = series.findIndex(
-    (sample) => sample.time === previousTime,
+  text(
+    "chart-detail",
+    compare
+      ? "Select a time to inspect the nearest reading for each day (within 7½ minutes)."
+      : "Select a point to inspect readings (within 7½ minutes).",
   );
-  if (previousIndex >= 0) inspect(previousIndex);
+  if (state.chartPosition !== null) inspect(nearestIndex(state.chartPosition));
   if (hadFocus) hit.focus({ preventScroll: true });
 }
+document.querySelectorAll("[data-chart-mode]").forEach((button) =>
+  button.addEventListener("click", () => {
+    state.chartMode = button.dataset.chartMode;
+    state.chartPosition = null;
+    saveChartPreferences();
+    if (state.chartMode === "compare" && state.start === state.end) {
+      setPeriod("week");
+      return;
+    }
+    renderChart(state.data);
+  }),
+);
+for (const [id, selection] of [
+  ["days-all", "all"],
+  ["days-reset", "latest"],
+  ["days-none", "none"],
+])
+  $(id).addEventListener("click", () => {
+    if (!state.data) return;
+    const days = SolarChart.daysBetween(state.data.start, state.data.end);
+    state.comparisonDays = new Set(
+      selection === "all" ? days : selection === "latest" ? days.slice(-3) : [],
+    );
+    $("day-options")
+      .querySelectorAll("input")
+      .forEach(
+        (input) => (input.checked = state.comparisonDays.has(input.value)),
+      );
+    state.chartPosition = null;
+    renderChart(state.data);
+  });
 $("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   busy(event.currentTarget, true);
@@ -965,6 +1219,7 @@ document.querySelectorAll("[data-period]").forEach((button) =>
 $("show-today").addEventListener("click", () => setPeriod("today"));
 document.querySelectorAll("[data-series]").forEach((input) =>
   input.addEventListener("change", () => {
+    saveChartPreferences();
     if (state.data) renderChart(state.data);
   }),
 );
@@ -1020,3 +1275,12 @@ setInterval(() => {
     else refresh();
   }
 }, 60000);
+
+let chartResizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(chartResizeTimer);
+  chartResizeTimer = setTimeout(() => {
+    if (state.authenticated && state.page === "overview" && state.data)
+      renderChart(state.data);
+  }, 120);
+});

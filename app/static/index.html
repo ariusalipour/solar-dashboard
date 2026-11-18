@@ -10,6 +10,7 @@
     <title>Solar — Overview</title>
     <script src="/static/theme.js"></script>
     <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/chart.js" defer></script>
     <script src="/static/app.js" defer></script>
   </head>
   <body>
@@ -281,6 +282,30 @@
                     <h3>Power over time <span class="unit-label">kW</span></h3>
                     <span id="chart-sample-count" class="muted"></span>
                   </div>
+                  <div class="chart-options">
+                    <div
+                      class="segmented chart-mode"
+                      role="group"
+                      aria-label="Chart view"
+                    >
+                      <button
+                        type="button"
+                        data-chart-mode="timeline"
+                        aria-pressed="true"
+                      >
+                        Timeline</button
+                      ><button
+                        type="button"
+                        data-chart-mode="compare"
+                        aria-pressed="false"
+                      >
+                        Compare days
+                      </button>
+                    </div>
+                    <span id="chart-mode-hint" class="muted"
+                      >Power across your selected dates.</span
+                    >
+                  </div>
                   <div class="chart-legend" aria-label="Chart series">
                     <label
                       ><input
@@ -306,6 +331,51 @@
                         data-series="feedinPower"
                         checked
                       /><span class="series-dot exported"></span>Export</label
+                    >
+                    <label
+                      ><input
+                        type="checkbox"
+                        data-series="battery"
+                        checked
+                      /><span class="series-dot battery"></span>Battery</label
+                    >
+                  </div>
+                  <div id="comparison-days" class="comparison-days" hidden>
+                    <div class="comparison-heading">
+                      <span>Days to compare</span>
+                      <div>
+                        <button id="days-all" class="text-button" type="button">
+                          Select all</button
+                        ><button
+                          id="days-reset"
+                          class="text-button"
+                          type="button"
+                        >
+                          Latest 3</button
+                        ><button
+                          id="days-none"
+                          class="text-button"
+                          type="button"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div
+                      id="day-options"
+                      class="day-options"
+                      role="group"
+                      aria-label="Days to compare"
+                    ></div>
+                    <p id="comparison-note" class="field-hint">
+                      UK local time, 00:00–24:00. Each day uses a different line
+                      pattern.
+                    </p>
+                  </div>
+                  <div id="battery-key" class="battery-key" hidden>
+                    <span class="battery-charge-key">Battery charge</span
+                    ><span class="battery-discharge-key"
+                      >Battery discharge (dashed)</span
                     >
                   </div>
                   <div id="chart-wrap" class="chart-wrap">

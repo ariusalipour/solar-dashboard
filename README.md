@@ -6,6 +6,7 @@ A private home energy dashboard for the official FoxESS Cloud Open API. Runs as 
 
 - Solar, household, grid and battery power with the inverter's measurement timestamp.
 - A historical power chart for a selected range of up to 31 days.
+- Compare daily power profiles on a shared UK time-of-day axis. Choose the days to overlay and toggle solar, battery, grid import, grid export and home consumption. Battery charge and discharge remain separate readings; missing measurements appear as gaps.
 - Editable peak/off-peak import rates and off-peak start/end times, export rate and daily standing charge. Prices are entered in **pence**, costs displayed in **GBP**.
 - Effective-dated tariffs: adding a rate change preserves earlier pricing. Start dates are unique. Edit an existing tariff to correct a mistake; historical cost estimates are recalculated and the previous version is retained in the database audit history.
 - Overnight schedules and UK daylight-saving time (`Europe/London`).
@@ -16,6 +17,7 @@ A private home energy dashboard for the official FoxESS Cloud Open API. Runs as 
 ## Using the dashboard
 
 - **Overview** shows current power readings, energy history and the cost breakdown for the selected period.
+- In the chart, choose **Compare days** to overlay daily profiles by UK clock time. Choose dates with the day checkboxes; **Latest 3**, **Select all** and **Clear** help manage the overlay. Toggle Solar, Battery, Import, Export or Home independently. Battery charge and discharge use separate traces. Select a time to compare the nearest readings for each day, or use arrow keys on the chart. Chart mode and metric switches are remembered in your browser; cost totals always cover the reporting date range, regardless of the chart's day/metric selection.
 - **Electricity tariff** holds peak/off-peak rates, off-peak hours, export payments, standing charge and tariff history. Use **Add a rate change** for new supplier prices or **Edit** to correct a saved tariff.
 - **Connection** manages the FoxESS API key and inverter selection, separate from routine monitoring.
 

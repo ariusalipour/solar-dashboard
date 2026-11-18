@@ -1752,3 +1752,199 @@ select:disabled {
     height: 14px;
   }
 }
+/* Daily comparison uses metric color and date-specific line patterns. */
+:root {
+  --battery-charge: #8051b0;
+  --battery-discharge: #b24682;
+}
+html[data-theme="dark"] {
+  --battery-charge: #bd9be9;
+  --battery-discharge: #ee9dc8;
+}
+.chart-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px 14px;
+  margin-bottom: 14px;
+}
+.chart-options .muted {
+  font-size: 11px;
+}
+.chart-mode button {
+  min-height: 30px;
+}
+.series-dot.battery {
+  background: var(--battery-charge);
+}
+.battery-charge-line {
+  stroke: var(--battery-charge);
+}
+.battery-discharge-line {
+  stroke: var(--battery-discharge);
+}
+.plot-point {
+  stroke: none;
+}
+.plot-point.solar-line {
+  fill: var(--solar);
+}
+.plot-point.home-line {
+  fill: var(--home);
+}
+.plot-point.grid-line {
+  fill: var(--import);
+}
+.plot-point.export-line {
+  fill: var(--export);
+}
+.plot-point.battery-charge-line {
+  fill: var(--battery-charge);
+}
+.plot-point.battery-discharge-line {
+  fill: var(--battery-discharge);
+}
+.comparison-days {
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.comparison-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+.comparison-heading > div {
+  display: flex;
+  gap: 12px;
+}
+.text-button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  min-height: 32px;
+  padding: 0;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.day-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+.day-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 11px;
+  min-height: 34px;
+  cursor: pointer;
+}
+.day-options label:has(input:checked) {
+  color: var(--text);
+  border-color: var(--control-hover-border);
+  background: var(--subtle);
+}
+.day-options input {
+  accent-color: var(--accent);
+  min-height: 0;
+  margin: 0;
+  width: 13px;
+  height: 13px;
+}
+.day-pattern {
+  width: 25px;
+  height: 10px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+.comparison-days .field-hint {
+  font-size: 10px !important;
+  margin-top: 10px;
+}
+.battery-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-top: 11px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.battery-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.battery-key span:before {
+  content: "";
+  display: inline-block;
+  width: 19px;
+  border-top: 2px solid var(--battery-charge);
+}
+.battery-key .battery-discharge-key:before {
+  border-top: 2px dashed var(--battery-discharge);
+}
+.chart-detail {
+  display: block;
+  max-height: 280px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.chart-detail > strong {
+  display: block;
+  color: var(--text);
+  font-weight: 550;
+  margin-bottom: 6px;
+}
+.chart-reading-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.chart-reading-row > strong {
+  color: var(--text);
+  min-width: 42px;
+  font-weight: 550;
+}
+.chart-reading-row > span {
+  white-space: normal;
+}
+@media (max-width: 760px) {
+  .chart-options {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .comparison-heading > div {
+    gap: 14px;
+  }
+  .day-options {
+    gap: 6px;
+  }
+  .day-options label {
+    font-size: 10px;
+    padding-inline: 6px;
+    gap: 5px;
+  }
+  .day-pattern {
+    width: 20px;
+  }
+  .chart-reading-row > strong {
+    flex-basis: 100%;
+  }
+  .chart-detail {
+    max-height: 240px;
+  }
+}
