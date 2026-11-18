@@ -2,7 +2,6 @@ import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput";
 import { Selector } from "@astryxdesign/core/Selector";
-import { DateRangeInput } from "@astryxdesign/core/DateRangeInput";
 import {
   SegmentedControl,
   SegmentedControlItem,
@@ -78,7 +77,7 @@ function preferences() {
   }
 }
 
-export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
+export default function PowerChart({ data, onCompareRequest }) {
   const [prefs] = useState(preferences);
   const [mode, setMode] = useState(
     prefs.mode === "compare" ? "compare" : "timeline",
@@ -155,7 +154,7 @@ export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
     [series, mode, start, end, visible, compareMetric, selectedDays.join(",")],
   );
   const points = tracks.flatMap((t) => t.points),
-    ready = points.length >= 2;
+    ready = points.length > 0;
   const bounds = { left: 42, right: width - 15, top: 15, bottom: 235 };
   const axisStart = compare ? 0 : start,
     axisEnd = compare ? 86400 : end;
@@ -284,16 +283,6 @@ export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
       </div>
       {compare ? (
         <div className="power-chart-comparison-controls">
-          <DateRangeInput
-            label="Comparison dates"
-            value={{ start: data.start, end: data.end }}
-            onChange={(next) => {
-              if (next) onRangeChange?.(next);
-            }}
-            hasClear={false}
-            maxRangeSpan={31}
-            description="Costs and totals use the same dates."
-          />
           <Selector
             label="Measurement"
             value={compareMetric}
@@ -308,6 +297,11 @@ export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
               }
             }}
           />
+          <p className="power-chart-range-context">
+            Comparing {dateLabel(data.start)}
+            {data.start !== data.end ? ` – ${dateLabel(data.end)}` : ""}. Change
+            dates using the period controls above.
+          </p>
         </div>
       ) : (
         <div className="power-chart-metrics" aria-label="Chart metrics">
@@ -345,16 +339,22 @@ export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
               variant="ghost"
               size="sm"
               label="Select all"
+              isDisabled={selectedDays.length === days.length}
               onClick={() => chooseDays(days)}
             />
             <Button
               variant="ghost"
               size="sm"
-              label="Clear"
+              label="Clear selection"
+              isDisabled={!selectedDays.length}
               onClick={() => chooseDays([])}
             />
           </div>
-          <div className="power-chart-day-list">
+          <div
+            className="power-chart-day-list"
+            role="group"
+            aria-label="Days shown on the chart"
+          >
             {days.map((day) => (
               <div className="power-chart-day" key={day}>
                 <span
@@ -529,9 +529,7 @@ export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
                 ? "Choose a series"
                 : compare && !selectedDays.length
                   ? "Choose days to compare"
-                  : points.length
-                    ? "Waiting for more readings"
-                    : "No readings for this selection"}
+                  : "No readings for this selection"}
             </strong>
             <p>
               {!activeFields.length
@@ -551,8 +549,8 @@ export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
         <div className="power-chart-detail">
           {inspection === null ? (
             <p>
-              Select a {compare ? "time" : "point"} to inspect readings within
-              7½ minutes.
+              Tap or move across the chart to see readings. Use arrow keys when
+              the chart is focused. Readings within 7½ minutes are shown.
             </p>
           ) : (
             <>

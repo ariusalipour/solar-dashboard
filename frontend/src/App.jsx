@@ -111,9 +111,9 @@ function ThemePicker({ value, onChange }) {
         value={value}
         onChange={onChange}
         options={[
-          { value: "system", label: "System theme" },
-          { value: "light", label: "Light theme" },
-          { value: "dark", label: "Dark theme" },
+          { value: "system", label: "System" },
+          { value: "light", label: "Light" },
+          { value: "dark", label: "Dark" },
         ]}
       />
     </div>
@@ -179,8 +179,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     document.title = `Solar — ${pages[page][0]}`;
-    if (status === "authenticated")
-      heading.current?.focus({ preventScroll: true });
+    if (status === "authenticated") heading.current?.focus();
   }, [page]);
   useEffect(() => {
     const expired = () => {
@@ -656,8 +655,7 @@ export default function App() {
                     </SegmentedControl>
                     <div className="solar-range-input">
                       <DateRangeInput
-                        label="Custom date range"
-                        isLabelHidden
+                        label="Date range"
                         value={range}
                         onChange={chooseDates}
                         max={localDate()}
@@ -683,7 +681,6 @@ export default function App() {
                       <PowerChart
                         data={report}
                         onCompareRequest={() => choosePeriod("week")}
-                        onRangeChange={chooseDates}
                       />
                       <Coverage data={report} />
                     </div>
@@ -793,7 +790,10 @@ function CostSummary({ data }) {
           ? "Partial estimate · gaps in readings are excluded."
           : "Import + standing charge − export credit.";
   return (
-    <Card padding={5} className="solar-cost">
+    <Card
+      padding={5}
+      className={`solar-cost${data.tariff_configured ? "" : " solar-cost-unconfigured"}`}
+    >
       <div className="solar-cost-heading">
         <h3>Estimated grid cost</h3>
         <span>GBP</span>
@@ -802,32 +802,34 @@ function CostSummary({ data }) {
         {pounds(valid ? c.net_cost : null)}
       </div>
       <p className="solar-muted solar-cost-status">{status}</p>
-      <dl className="solar-cost-breakdown">
-        <CostRow
-          title="Peak import"
-          detail={kwh(valid && finite(c.peak_cost) ? c.peak_kwh : null)}
-          value={pounds(valid ? c.peak_cost : null)}
-        />
-        <CostRow
-          title="Off-peak import"
-          detail={kwh(valid && finite(c.offpeak_cost) ? c.offpeak_kwh : null)}
-          value={pounds(valid ? c.offpeak_cost : null)}
-        />
-        <CostRow
-          title="Export credit"
-          detail={kwh(valid ? c.export_kwh : null)}
-          value={
-            valid && finite(c.export_credit)
-              ? `−${pounds(c.export_credit)}`
-              : "—"
-          }
-        />
-        <CostRow
-          title="Standing charge"
-          detail={`${days} ${days === 1 ? "day" : "days"}`}
-          value={pounds(c.standing_charge)}
-        />
-      </dl>
+      {data.tariff_configured && (
+        <dl className="solar-cost-breakdown">
+          <CostRow
+            title="Peak import"
+            detail={kwh(valid && finite(c.peak_cost) ? c.peak_kwh : null)}
+            value={pounds(valid ? c.peak_cost : null)}
+          />
+          <CostRow
+            title="Off-peak import"
+            detail={kwh(valid && finite(c.offpeak_cost) ? c.offpeak_kwh : null)}
+            value={pounds(valid ? c.offpeak_cost : null)}
+          />
+          <CostRow
+            title="Export credit"
+            detail={kwh(valid ? c.export_kwh : null)}
+            value={
+              valid && finite(c.export_credit)
+                ? `−${pounds(c.export_credit)}`
+                : "—"
+            }
+          />
+          <CostRow
+            title="Standing charge"
+            detail={`${days} ${days === 1 ? "day" : "days"}`}
+            value={pounds(c.standing_charge)}
+          />
+        </dl>
+      )}
       <div className="solar-cost-energy">
         <div>
           <span>Grid import</span>
@@ -838,12 +840,20 @@ function CostSummary({ data }) {
           <strong>{kwh(valid ? c.export_kwh : null)}</strong>
         </div>
       </div>
-      <a href="#tariff" className="solar-text-link">
-        {data.tariff_configured
-          ? "View electricity tariff"
-          : "Set electricity tariff"}{" "}
-        <span aria-hidden="true">→</span>
-      </a>
+      {!data.tariff_configured ? (
+        <Button
+          href="#tariff"
+          label="Add electricity tariff"
+          variant="primary"
+        />
+      ) : (
+        <a href="#tariff" className="solar-text-link">
+          {data.tariff_configured
+            ? "View electricity tariff"
+            : "Set electricity tariff"}{" "}
+          <span aria-hidden="true">→</span>
+        </a>
+      )}
     </Card>
   );
 }

@@ -135,19 +135,25 @@ export function TariffPage({ settings, onSettingsChange, api }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
   const [entryErrors, setEntryErrors] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const formElement = useRef(null);
   const heading = useRef(null);
+  const trackEntryError = (field) => (error) =>
+    setEntryErrors((previous) => ({ ...previous, [field]: !!error }));
   const update = (field, value) =>
     setForm((previous) => ({ ...previous, [field]: value }));
   const startNew = () => {
     setEditing(null);
     setForm(emptyTariff());
     setEntryErrors({});
+    setSubmitted(false);
     setNotice(null);
   };
   const correct = (tariff) => {
     setEditing(tariff.effective_from);
     setForm({ ...tariff });
     setEntryErrors({});
+    setSubmitted(false);
     setNotice(null);
     requestAnimationFrame(() => {
       heading.current?.focus();
@@ -157,6 +163,7 @@ export function TariffPage({ settings, onSettingsChange, api }) {
   async function submit(event) {
     event.preventDefault();
     if (busy) return;
+    setSubmitted(true);
     const failure = !form.effective_from
       ? "Choose an effective date."
       : rates.some(
@@ -168,7 +175,7 @@ export function TariffPage({ settings, onSettingsChange, api }) {
           )
         ? "Enter each rate in pence, including 0 where no charge or credit applies."
         : Object.values(entryErrors).some(Boolean)
-          ? "Correct the highlighted rate before saving."
+          ? "Correct the highlighted fields before saving."
           : !clock(form.offpeak_start) || !clock(form.offpeak_end)
             ? "Choose both off-peak times."
             : form.offpeak_start === form.offpeak_end
@@ -181,6 +188,9 @@ export function TariffPage({ settings, onSettingsChange, api }) {
                 : null;
     if (failure) {
       setNotice({ error: true, text: failure });
+      requestAnimationFrame(() => {
+        formElement.current?.querySelector('[aria-invalid="true"]')?.focus();
+      });
       return;
     }
     setBusy(true);
@@ -196,6 +206,7 @@ export function TariffPage({ settings, onSettingsChange, api }) {
         : "Tariff saved. Costs use these rates from its effective date.";
       setEditing(null);
       setForm(emptyTariff());
+      setSubmitted(false);
       try {
         await onSettingsChange();
         setNotice({ text: message });
@@ -214,6 +225,30 @@ export function TariffPage({ settings, onSettingsChange, api }) {
       setBusy(false);
     }
   }
+  const fieldStatus = (field) => {
+    if (!submitted) return undefined;
+    let message;
+    if (field === "effective_from") {
+      if (!form[field]) message = "Choose an effective date.";
+      else if (
+        !editing &&
+        tariffs.some((tariff) => tariff.effective_from === form[field])
+      )
+        message = "A tariff starts on this date. Correct it in Tariff history.";
+    } else if (field.startsWith("offpeak_") && field !== "offpeak_rate") {
+      if (!clock(form[field])) message = "Enter a time in 24-hour format.";
+      else if (form.offpeak_start === form.offpeak_end)
+        message = "Start and end must be different.";
+    } else if (
+      form[field] == null ||
+      !Number.isFinite(form[field]) ||
+      form[field] < 0 ||
+      form[field] > 1000000
+    ) {
+      message = "Enter a rate in pence. Use 0 if none applies.";
+    }
+    return message ? { type: "error", message } : undefined;
+  };
   return (
     <div className="solar-settings-page">
       <div className="solar-settings-layout">
@@ -270,7 +305,8 @@ export function TariffPage({ settings, onSettingsChange, api }) {
               )}
             </div>
             <p className="solar-settings-muted">
-              All prices are in pence. Enter 7.5 for 7.5p per kWh.
+              All prices are in pence. Enter 7.5 for 7.5p per kWh, or 0 where no
+              charge or export credit applies.
             </p>
             {editing && (
               <Banner
@@ -282,10 +318,15 @@ export function TariffPage({ settings, onSettingsChange, api }) {
             <form
               className="solar-settings-form"
               onSubmit={submit}
+              ref={formElement}
+              noValidate
               aria-busy={busy}
             >
               <DateInput
                 label="Effective from"
+                status={fieldStatus("effective_from")}
+                onEntryErrorChange={trackEntryError("effective_from")}
+                statusVariant="detached"
                 value={form.effective_from || undefined}
                 onChange={(value) => {
                   if (!editing) update("effective_from", value || "");
@@ -305,6 +346,8 @@ export function TariffPage({ settings, onSettingsChange, api }) {
                   <NumberInput
                     key={key}
                     label={label}
+                    status={fieldStatus(key)}
+                    statusVariant="detached"
                     value={form[key]}
                     onChange={(value) => update(key, value)}
                     units={unit}
@@ -316,20 +359,18 @@ export function TariffPage({ settings, onSettingsChange, api }) {
                     isDisabled={busy}
                     isWheelEnabled={false}
                     width="100%"
-                    onEntryErrorChange={(error) =>
-                      setEntryErrors((previous) => ({
-                        ...previous,
-                        [key]: !!error,
-                      }))
-                    }
+                    onEntryErrorChange={trackEntryError(key)}
                   />
                 ))}
               </div>
               <fieldset className="solar-settings-fieldset">
-                <legend>Off-peak hours</legend>
+                <legend>Off-peak hours (UK local time)</legend>
                 <div className="solar-settings-input-grid">
                   <TimeInput
                     label="Starts at"
+                    status={fieldStatus("offpeak_start")}
+                    onEntryErrorChange={trackEntryError("offpeak_start")}
+                    statusVariant="detached"
                     value={form.offpeak_start || undefined}
                     onChange={(value) =>
                       update("offpeak_start", value?.slice(0, 5) || "")
@@ -342,6 +383,9 @@ export function TariffPage({ settings, onSettingsChange, api }) {
                   />
                   <TimeInput
                     label="Ends at"
+                    status={fieldStatus("offpeak_end")}
+                    onEntryErrorChange={trackEntryError("offpeak_end")}
+                    statusVariant="detached"
                     value={form.offpeak_end || undefined}
                     onChange={(value) =>
                       update("offpeak_end", value?.slice(0, 5) || "")
@@ -400,11 +444,12 @@ export function TariffPage({ settings, onSettingsChange, api }) {
                     </div>
                     <dl>
                       <div>
-                        <dt>Peak / off-peak</dt>
-                        <dd>
-                          {pence(tariff.peak_rate, "p")} /{" "}
-                          {pence(tariff.offpeak_rate, "p")}
-                        </dd>
+                        <dt>Peak import</dt>
+                        <dd>{pence(tariff.peak_rate)}</dd>
+                      </div>
+                      <div>
+                        <dt>Off-peak import</dt>
+                        <dd>{pence(tariff.offpeak_rate)}</dd>
                       </div>
                       <div>
                         <dt>Off-peak hours</dt>
@@ -413,11 +458,12 @@ export function TariffPage({ settings, onSettingsChange, api }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>Standing / export</dt>
-                        <dd>
-                          {pence(tariff.standing_charge, "p/day")} /{" "}
-                          {pence(tariff.export_rate)}
-                        </dd>
+                        <dt>Standing charge</dt>
+                        <dd>{pence(tariff.standing_charge, "p/day")}</dd>
+                      </div>
+                      <div>
+                        <dt>Export credit</dt>
+                        <dd>{pence(tariff.export_rate)}</dd>
                       </div>
                     </dl>
                     <Button
@@ -580,7 +626,13 @@ export function ConnectionPage({ settings, onSettingsChange, api, data }) {
                 }))}
                 onChange={setSelected}
                 isRequired
-                isDisabled={busy}
+                isDisabled={busy || !!settings?.selected_sn}
+                disabledMessage={
+                  settings?.selected_sn
+                    ? "This dashboard is linked to this inverter to keep its history together."
+                    : undefined
+                }
+                presentation="adaptive"
                 width="100%"
                 placeholder="Choose your inverter"
                 description={

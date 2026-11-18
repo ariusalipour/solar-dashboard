@@ -1,5 +1,7 @@
 .solar-settings-page {
   width: 100%;
+  --solar-schedule-peak: light-dark(#b5a895, #897c69);
+  --solar-schedule-offpeak: light-dark(#477656, #88bc95);
 }
 .solar-settings-layout {
   display: grid;
@@ -109,10 +111,10 @@
   font: 12px sans-serif;
 }
 .solar-settings-peak-bar {
-  fill: #ddd5c9;
+  fill: var(--solar-schedule-peak);
 }
 .solar-settings-offpeak-bar {
-  fill: #688b73;
+  fill: var(--solar-schedule-offpeak);
 }
 .solar-settings-schedule-key {
   display: flex;
@@ -133,10 +135,10 @@
   flex: 0 0 auto;
 }
 .solar-settings-offpeak-dot {
-  background: #688b73;
+  background: var(--solar-schedule-offpeak);
 }
 .solar-settings-peak-dot {
-  background: #ddd5c9;
+  background: var(--solar-schedule-peak);
 }
 .solar-settings-empty {
   color: var(--color-text-secondary, #666);
@@ -218,5 +220,20 @@
   }
   .solar-settings-rate-grid {
     gap: 20px 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .solar-settings-rate-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .solar-settings-history dl div,
+  .solar-settings-status div {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .solar-settings-history dd,
+  .solar-settings-status dd {
+    text-align: left;
   }
 }

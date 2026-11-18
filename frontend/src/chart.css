@@ -20,8 +20,8 @@
 }
 .power-chart-comparison-controls {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(180px, 1fr);
-  align-items: start;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+  align-items: center;
   gap: 20px;
   margin: 22px 0 18px;
 }
@@ -76,22 +76,15 @@
   margin-right: auto;
 }
 .power-chart-day-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 10px 16px;
   margin-top: 12px;
 }
 .power-chart-day {
   display: flex;
   align-items: center;
   gap: 7px;
-}
-.power-chart-day > svg {
-  width: 25px;
-  height: 10px;
-  flex-shrink: 0;
-  stroke: currentColor;
-  stroke-width: 2;
 }
 .power-chart-battery-key {
   display: flex;

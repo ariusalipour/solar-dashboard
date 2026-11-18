@@ -278,7 +278,7 @@ h1[tabindex="-1"] {
 }
 .solar-range-controls {
   display: flex;
-  align-items: center;
+  align-items: end;
   gap: 10px;
   flex-wrap: wrap;
   min-width: 0;
@@ -358,6 +358,13 @@ h1[tabindex="-1"] {
   border-top: 1px solid var(--color-border);
   margin-top: 20px;
   padding-top: 10px;
+}
+.solar-cost > a[role="button"],
+.solar-cost > button {
+  margin-top: 18px;
+}
+h1[tabindex="-1"] {
+  scroll-margin-top: 90px;
 }
 .solar-cost-energy > div {
   display: flex;
@@ -584,7 +591,7 @@ h1[tabindex="-1"] {
     font-size: 11px;
   }
   .solar-coverage {
-    font-size: 10px;
+    font-size: 12px;
   }
   .solar-setup {
     margin: 15px 0 35px;
@@ -602,6 +609,25 @@ h1[tabindex="-1"] {
   }
   .solar-auth {
     padding: 20px;
+  }
+}
+@media (max-width: 600px) {
+  .solar-cost {
+    display: block;
+  }
+  .solar-cost-breakdown {
+    margin-top: 20px;
+  }
+  .solar-cost-breakdown > div,
+  .solar-cost-status,
+  .solar-cost-energy > div {
+    font-size: 13px;
+  }
+  .solar-cost-breakdown dt > span {
+    font-size: 12px;
+  }
+  .solar-cost-energy {
+    display: block;
   }
 }
 @media (max-width: 380px) {
@@ -630,7 +656,14 @@ h1[tabindex="-1"] {
     padding: 14px;
   }
   .solar-theme-picker {
-    width: 105px;
+    width: 78px;
+  }
+  .solar-top-actions button {
+    padding-inline: 6px;
+  }
+  .solar-range-controls [role="radio"] {
+    padding-inline: 6px;
+    font-size: 12px;
   }
   .solar-top-actions {
     gap: 3px;
@@ -642,4 +675,10 @@ h1[tabindex="-1"] {
   *::after {
     scroll-behavior: auto !important;
   }
+}
+.solar-cost-unconfigured {
+  display: block;
+}
+.solar-cost-unconfigured > a {
+  margin-top: 18px;
 }
