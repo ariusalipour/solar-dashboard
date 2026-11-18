@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import hashlib
 import hmac
 import json
@@ -207,6 +206,20 @@ def create_app(store=None, collect=True):
             raise HTTPException(422, str(exc)) from None
         return {'tariffs': store.tariffs()}
 
+    @app.put('/api/tariffs/{effective_from}')
+    async def correct_tariff(effective_from: str, request: Request):
+        try:
+            tariff = validate_tariff(await request.json())
+            if tariff['timezone'] != 'Europe/London':
+                raise ValueError('This dashboard uses Europe/London tariffs.')
+            if effective_from != tariff['effective_from']:
+                raise ValueError('The tariff effective date must match the date in the URL.')
+        except (ValueError, TypeError, KeyError) as exc:
+            raise HTTPException(422, str(exc)) from None
+        if not store.correct_tariff(tariff):
+            raise HTTPException(404, 'No tariff starts on this date.')
+        return {'tariffs': store.tariffs()}
+
     @app.get('/api/dashboard')
     def dashboard(start: str | None = None, end: str | None = None):
         today = datetime.now(LOCAL_ZONE).date()
@@ -227,9 +240,14 @@ def create_app(store=None, collect=True):
         latest = store.latest()
         age = (datetime.now(timezone.utc) - parse_time(latest['time'])).total_seconds() if latest else None
         return {'start': first.isoformat(), 'end': last.isoformat(), 'timezone': 'Europe/London',
+                'chart_start': utc_string(begin),
+                'chart_end': utc_string(datetime.combine(last + timedelta(days=1), datetime.min.time(), LOCAL_ZONE)),
                 'latest': latest, 'stale': age is None or age > 900, 'age_seconds': age,
                 'costs': costs, 'coverage': {'seconds': covered, 'expected_seconds': elapsed, 'percent': min(100, covered / elapsed * 100)},
-                'series': [s for s in samples if s['time'] >= utc_string(begin)],
+                'has_energy_intervals': covered > 0,
+                'interval_count': sum(1 for i in intervals if parse_time(i['end']) > begin and parse_time(i['start']) < finish),
+                'first_sample_at': store.first_sample_at(),
+                'series': [s for s in samples if utc_string(begin) <= s['time'] < utc_string(finish)],
                 'collector': store.get('collector', {}), 'connected': bool(store.get('fox', {}).get('sn')),
                 'calls_today': store.call_count(utc_string(datetime.now(timezone.utc) - timedelta(hours=24))),
                 'tariff_configured': bool(store.tariffs())}

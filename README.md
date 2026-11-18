@@ -7,10 +7,16 @@ A private home energy dashboard for the official FoxESS Cloud Open API. Runs as 
 - Solar, household, grid and battery power with the inverter's measurement timestamp.
 - A historical power chart for a selected range of up to 31 days.
 - Editable peak/off-peak import rates and off-peak start/end times, export rate and daily standing charge. Prices are entered in **pence**, costs displayed in **GBP**.
-- Effective-dated tariffs: adding a new tariff preserves earlier rates. Effective dates are unique and existing tariff records are immutable.
+- Effective-dated tariffs: adding a rate change preserves earlier pricing. Start dates are unique. Edit an existing tariff to correct a mistake; historical cost estimates are recalculated and the previous version is retained in the database audit history.
 - Overnight schedules and UK daylight-saving time (`Europe/London`).
 - Separate import cost, export credit, standing charge and net cost, with explicit data coverage.
 - Password-protected household access, secure session cookies on HTTPS, same-origin request protection, and server-side cloud credentials.
+
+## Using the dashboard
+
+- **Overview** shows current power readings, energy history and the cost breakdown for the selected period.
+- **Electricity tariff** holds peak/off-peak rates, off-peak hours, export payments, standing charge and tariff history. Use **Add a rate change** for new supplier prices or **Edit** to correct a saved tariff.
+- **Connection** manages the FoxESS API key and inverter selection, separate from routine monitoring.
 
 ## Run in Docker
 
@@ -26,7 +32,7 @@ docker compose up -d --build
 
 The port binds to **127.0.0.1:3050**. Put HTTPS and private access in front of it (for example Cloudflare Tunnel plus Access). Set `SOLAR_PUBLIC_ORIGIN` to the exact HTTPS origin. Do not expose the container port directly. For local HTTP use set that variable to `http://127.0.0.1:3050` so cookies are usable.
 
-Sign in using the configured household password. Open **Settings**, enter a FoxESS API key, discover/select your inverter, and add your tariff. You do not need to provide your FoxESS password to this application. The API key is stored in the private SQLite volume and is never returned to the browser. It is not encrypted at rest: protect the NAS volume and its backups as credentials.
+Sign in using the configured household password. Open **Connection**, enter a FoxESS API key and discover/select your inverter. Add your rates and schedule under **Electricity tariff**. You do not need to provide your FoxESS password to this application. The API key is stored in the private SQLite volume and is never returned to the browser. It is not encrypted at rest: protect the NAS volume and its backups as credentials.
 
 Obtain a key at the [FoxESS developer portal](https://developer-eu.foxesscloud.com/apiKeys). See the [official Open API documentation](https://www.foxesscloud.com/public/i18n/en/OpenApiDocument.html).
 

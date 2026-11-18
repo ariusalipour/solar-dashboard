@@ -2,6 +2,7 @@
 import hashlib
 import io
 import json
+import sqlite3
 from datetime import datetime, timezone
 
 import pytest
@@ -118,6 +119,108 @@ def test_tariff_other_timezone_rejected_without_breaking_dashboard(session):
     response = client.post('/api/tariffs', json={**TARIFF, 'timezone': 'America/New_York'}, headers=HEADERS)
     assert response.status_code == 422
     assert client.get('/api/dashboard?start=2026-01-02').status_code == 200
+
+
+def test_tariff_correction_recalculates_costs_and_audits_previous_values(session):
+    client, store = session
+    login(client)
+    original = client.post('/api/tariffs', json=TARIFF, headers=HEADERS).json()['tariffs'][0]
+    store.add_sample(sample('2026-01-02T05:55:00Z'))
+    store.add_sample(sample('2026-01-02T06:00:00Z', 10.5, 2.1))
+    store.add_sample(sample('2026-01-02T06:05:00Z', 11, 2.2))
+    before = client.get('/api/dashboard?start=2026-01-02').json()
+    assert before['costs']['net_cost'] == pytest.approx(.67)
+    corrected = {**TARIFF, 'offpeak_rate': 5, 'offpeak_end': '07:00'}
+    response = client.put('/api/tariffs/2026-01-01', json=corrected, headers=HEADERS)
+    assert response.status_code == 200
+    assert response.json()['tariffs'][0]['offpeak_rate'] == 5
+    after = client.get('/api/dashboard?start=2026-01-02').json()
+    assert after['costs']['offpeak_kwh'] == pytest.approx(1)
+    assert after['costs']['peak_kwh'] == 0
+    assert after['costs']['net_cost'] == pytest.approx(.52)
+    assert after['has_energy_intervals'] is True
+    assert after['interval_count'] == 2
+    assert after['first_sample_at'] == '2026-01-02T05:55:00Z'
+    with store.connect() as db:
+        revisions = db.execute('SELECT * FROM tariff_revisions').fetchall()
+    assert len(revisions) == 1
+    assert revisions[0]['effective_from'] == '2026-01-01'
+    assert json.loads(revisions[0]['data']) == original
+    assert parse_time(revisions[0]['changed_at']).tzinfo == timezone.utc
+    # Duplicate creation still protects history; corrections use the explicit PUT.
+    assert client.post('/api/tariffs', json=TARIFF, headers=HEADERS).status_code == 409
+
+
+@pytest.mark.parametrize('changes,url,status', [
+    ({'timezone': 'America/New_York'}, '2026-01-01', 422),
+    ({'effective_from': '2026-01-02'}, '2026-01-01', 422),
+    ({'effective_from': '2026-01-02'}, '2026-01-02', 404),
+    ({'peak_rate': -1}, '2026-01-01', 422),
+])
+def test_invalid_tariff_correction_never_changes_tariff_or_audit(session, changes, url, status):
+    client, store = session
+    login(client)
+    client.post('/api/tariffs', json=TARIFF, headers=HEADERS)
+    original = store.tariffs()
+    assert client.put(f'/api/tariffs/{url}', json={**TARIFF, **changes}, headers=HEADERS).status_code == status
+    assert store.tariffs() == original
+    with store.connect() as db:
+        assert db.execute('SELECT count(*) FROM tariff_revisions').fetchone()[0] == 0
+
+
+def test_tariff_correction_requires_authentication_and_csrf(session):
+    client, _ = session
+    path = '/api/tariffs/2026-01-01'
+    assert client.put(path, json=TARIFF, headers=HEADERS).status_code == 401
+    login(client)
+    assert client.put(path, json=TARIFF).status_code == 403
+    assert client.put(path, json=TARIFF, headers={**HEADERS, 'origin': 'https://hostile.test'}).status_code == 403
+
+
+def test_tariff_correction_audit_and_replacement_rollback_together(tmp_path):
+    store = Store(tmp_path)
+    store.save_tariff(TARIFF)
+    with store.connect() as db:
+        db.execute("CREATE TRIGGER reject_tariff_update BEFORE UPDATE ON tariffs BEGIN SELECT RAISE(ABORT, 'simulated failure'); END")
+    with pytest.raises(sqlite3.IntegrityError):
+        store.correct_tariff({**TARIFF, 'peak_rate': 40})
+    assert store.tariffs() == [TARIFF]
+    with store.connect() as db:
+        assert db.execute('SELECT count(*) FROM tariff_revisions').fetchone()[0] == 0
+
+
+def test_dashboard_distinguishes_samples_from_valid_energy_intervals(session):
+    client, store = session
+    login(client)
+    client.post('/api/tariffs', json=TARIFF, headers=HEADERS)
+    empty = client.get('/api/dashboard?start=2026-01-02').json()
+    assert empty['has_energy_intervals'] is False
+    assert empty['interval_count'] == 0
+    assert empty['first_sample_at'] is None
+    # Two measurements with reset counters cannot establish metered usage.
+    store.add_sample(sample('2026-01-02T05:55:00Z'))
+    store.add_sample(sample('2026-01-02T06:00:00Z', 1, 0))
+    invalid = client.get('/api/dashboard?start=2026-01-02').json()
+    assert invalid['has_energy_intervals'] is False
+    assert invalid['interval_count'] == 0
+    assert invalid['first_sample_at'] == '2026-01-02T05:55:00Z'
+    store.add_sample(sample('2026-01-02T06:05:00Z', 1, 0))
+    zero_usage = client.get('/api/dashboard?start=2026-01-02').json()
+    assert zero_usage['has_energy_intervals'] is True
+    assert zero_usage['interval_count'] == 1
+    assert zero_usage['costs']['import_kwh'] == 0
+
+
+def test_report_uses_boundary_counter_without_showing_next_days_reading(session):
+    client, store = session
+    login(client)
+    store.add_sample(sample('2026-01-01T23:55:00Z', 10, 2))
+    store.add_sample(sample('2026-01-02T00:00:00Z', 10.5, 2.1))
+    report = client.get('/api/dashboard?start=2026-01-01').json()
+    assert [row['time'] for row in report['series']] == ['2026-01-01T23:55:00Z']
+    assert report['costs']['import_kwh'] == pytest.approx(0.5)
+    assert report['has_energy_intervals'] is True
+    assert report['chart_end'] == '2026-01-02T00:00:00Z'
 
 
 def test_new_key_cannot_clear_pinned_inverter_and_mix_history(session, monkeypatch):
