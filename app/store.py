@@ -1,0 +1,79 @@
+"""Private SQLite persistence. All timestamps are UTC; no cloud credentials in responses."""
+import json
+import os
+import sqlite3
+from contextlib import contextmanager
+from pathlib import Path
+
+
+class Store:
+    def __init__(self, directory):
+        self.directory = Path(directory)
+        self.directory.mkdir(parents=True, exist_ok=True)
+        self.path = self.directory / 'solar.sqlite3'
+        with self.connect() as db:
+            db.executescript('''
+                PRAGMA journal_mode=WAL;
+                CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS samples (time TEXT PRIMARY KEY, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS tariffs (effective_from TEXT PRIMARY KEY, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS calls (time TEXT NOT NULL);
+            ''')
+        os.chmod(self.path, 0o600)
+
+    @contextmanager
+    def connect(self):
+        db = sqlite3.connect(self.path, timeout=15)
+        db.row_factory = sqlite3.Row
+        try:
+            yield db
+            db.commit()
+        finally:
+            db.close()
+
+    def get(self, key, default=None):
+        with self.connect() as db:
+            row = db.execute('SELECT value FROM config WHERE key=?', (key,)).fetchone()
+        return json.loads(row['value']) if row else default
+
+    def set(self, key, value):
+        with self.connect() as db:
+            db.execute('INSERT OR REPLACE INTO config VALUES (?,?)', (key, json.dumps(value)))
+
+    def tariffs(self):
+        with self.connect() as db:
+            return [json.loads(r['data']) for r in db.execute('SELECT data FROM tariffs ORDER BY effective_from')]
+
+    def save_tariff(self, tariff):
+        with self.connect() as db:
+            db.execute('INSERT INTO tariffs VALUES (?,?)', (tariff['effective_from'], json.dumps(tariff)))
+
+    def add_sample(self, sample):
+        with self.connect() as db:
+            db.execute('INSERT OR IGNORE INTO samples VALUES (?,?)', (sample['time'], json.dumps(sample)))
+
+    def samples(self, start, end):
+        with self.connect() as db:
+            # One preceding measurement establishes the first interval of the day.
+            rows = db.execute('SELECT data FROM samples WHERE time>=? AND time<=? ORDER BY time', (start, end)).fetchall()
+            prev = db.execute('SELECT data FROM samples WHERE time<? ORDER BY time DESC LIMIT 1', (start,)).fetchone()
+        return ([json.loads(prev['data'])] if prev else []) + [json.loads(r['data']) for r in rows]
+
+    def latest(self):
+        with self.connect() as db:
+            row = db.execute('SELECT data FROM samples ORDER BY time DESC LIMIT 1').fetchone()
+        return json.loads(row['data']) if row else None
+
+    def register_call(self, now):
+        """Reserve quota before every attempted cloud call, across restarts."""
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute("DELETE FROM calls WHERE time < strftime('%Y-%m-%dT%H:%M:%SZ', ?, '-25 hours')", (now,))
+            count = db.execute("SELECT count(*) FROM calls WHERE time >= strftime('%Y-%m-%dT%H:%M:%SZ', ?, '-24 hours')", (now,)).fetchone()[0]
+            if count >= 1000:
+                raise RuntimeError('Local daily API budget reached; collection will resume automatically.')
+            db.execute('INSERT INTO calls VALUES (?)', (now,))
+
+    def call_count(self, start):
+        with self.connect() as db:
+            return db.execute('SELECT count(*) FROM calls WHERE time>=?', (start,)).fetchone()[0]

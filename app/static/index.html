@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#173f34" />
+    <title>Solar · Home energy</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to dashboard</a>
+    <section id="login-view" class="login-view" hidden>
+      <div class="login-art" aria-hidden="true">
+        <span class="sun-mark">✳</span>
+        <p>A little closer<br />to your energy.</p>
+      </div>
+      <form id="login-form" class="login-form">
+        <span class="eyebrow">SOLAR / PRIVATE ACCESS</span>
+        <h1>Your home.<br />Your energy.</h1>
+        <p>Sign in to your household energy dashboard.</p>
+        <label for="password">Household password</label
+        ><input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        /><button class="primary" type="submit">
+          Open dashboard <span aria-hidden="true">↗</span>
+        </button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+    </section>
+    <div id="dashboard-view" hidden>
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Solar home"
+          ><span aria-hidden="true">✳</span> solar<span class="brand-divider"
+            >/</span
+          ><small>HOME ENERGY</small></a
+        >
+        <div class="header-actions">
+          <span class="private-label">PRIVATE HOUSEHOLD</span
+          ><button id="settings-open" class="button-outline">
+            Settings <span aria-hidden="true">↗</span></button
+          ><button id="logout" class="quiet">Sign out</button>
+        </div>
+      </header>
+      <main id="main">
+        <section class="intro">
+          <div>
+            <p class="eyebrow">THE HOUSEHOLD ENERGY OBSERVATORY</p>
+            <h1>A brighter picture.</h1>
+            <p class="intro-copy">
+              See where your energy goes. Know what it costs.
+            </p>
+          </div>
+          <div class="reading-status">
+            <span id="status-dot" class="status-dot"></span
+            ><span id="reading-status">Waiting for a reading</span
+            ><small id="reading-time"
+              >Connect your inverter to get started</small
+            >
+          </div>
+        </section>
+        <div id="page-error" class="notice error" role="alert" hidden></div>
+        <div id="setup-notice" class="notice" hidden>
+          <div>
+            <strong>Make yourself at home.</strong>
+            <p>
+              Connect FoxESS Cloud and add your electricity tariff. Your energy
+              story starts with the first reading.
+            </p>
+          </div>
+          <button id="setup-open" class="primary">
+            Set up your dashboard ↗
+          </button>
+        </div>
+        <section class="overview" aria-labelledby="flow-title">
+          <div class="flow-panel">
+            <div class="section-heading">
+              <h2 id="flow-title">Around your home</h2>
+              <span class="eyebrow" id="flow-state">LATEST READING</span>
+            </div>
+            <div class="energy-flow">
+              <svg class="flow-lines" viewBox="0 0 700 300" aria-hidden="true">
+                <path d="M350 65V150M350 150H100M350 150H600M350 150V250" />
+                <circle cx="350" cy="150" r="47" />
+              </svg>
+              <div class="flow-node solar-node">
+                <span class="node-icon" aria-hidden="true">☀</span
+                ><span class="node-label">Solar generation</span
+                ><strong id="pv-value">—</strong>
+              </div>
+              <div class="flow-node grid-node">
+                <span class="node-icon" aria-hidden="true">↔</span
+                ><span class="node-label">Grid import / export</span
+                ><strong id="grid-value">—</strong>
+              </div>
+              <div class="flow-home" aria-hidden="true">
+                <svg viewBox="0 0 48 48">
+                  <path d="M6 23 24 8l18 15M12 20v21h24V20M20 41V28h8v13" />
+                </svg>
+              </div>
+              <div class="flow-node home-node">
+                <span class="node-icon" aria-hidden="true">⌂</span
+                ><span class="node-label">Home consumption</span
+                ><strong id="home-value">—</strong>
+              </div>
+              <div class="flow-node battery-node">
+                <span class="node-label">Battery</span
+                ><strong id="battery-value">—</strong
+                ><small id="battery-detail">Awaiting battery data</small>
+              </div>
+            </div>
+            <p class="panel-footnote" id="flow-note">
+              Power readings will appear after your inverter is connected.
+            </p>
+          </div>
+          <aside class="cost-highlight">
+            <p class="eyebrow">YOUR SELECTED PERIOD</p>
+            <h2>Energy, accounted for.</h2>
+            <div class="net-cost" id="net-cost">—</div>
+            <p class="net-label">Estimated net grid cost</p>
+            <div class="cost-rule"></div>
+            <dl>
+              <div>
+                <dt>Grid energy in</dt>
+                <dd id="import-total">—</dd>
+              </div>
+              <div>
+                <dt>Grid energy out</dt>
+                <dd id="export-total">—</dd>
+              </div>
+            </dl>
+            <p class="estimate-label">Estimated · measured intervals</p>
+            <p id="coverage-text" class="cost-note">
+              Waiting for collected readings.
+            </p>
+          </aside>
+        </section>
+        <section class="history-section">
+          <div class="history-header">
+            <div>
+              <p class="eyebrow">THE BIGGER PICTURE</p>
+              <h2>Energy over time</h2>
+            </div>
+            <div class="period-controls" aria-label="Choose reporting period">
+              <button data-period="today" class="active" aria-pressed="true">
+                Today</button
+              ><button data-period="yesterday" aria-pressed="false">
+                Yesterday</button
+              ><button data-period="week" aria-pressed="false">7 days</button
+              ><button data-period="month" aria-pressed="false">30 days</button>
+            </div>
+          </div>
+          <form id="range-form" class="date-range">
+            <label>From <input id="range-start" type="date" required /></label
+            ><label>To <input id="range-end" type="date" required /></label
+            ><button class="button-outline" type="submit">Apply dates</button
+            ><span id="range-caption"></span>
+          </form>
+          <div id="range-error" class="error" role="alert"></div>
+          <div class="chart-legend">
+            <span class="solar-key">Solar</span
+            ><span class="home-key">Home</span
+            ><span class="grid-key">Grid import</span
+            ><span class="export-key">Grid export</span
+            ><span class="chart-unit">kW</span>
+          </div>
+          <div class="chart-wrap">
+            <svg
+              id="energy-chart"
+              viewBox="0 0 1100 260"
+              role="img"
+              aria-labelledby="chart-title chart-desc"
+            >
+              <title id="chart-title">
+                Energy readings over the selected period
+              </title>
+              <desc id="chart-desc">No readings collected yet.</desc>
+            </svg>
+            <div id="chart-empty" class="chart-empty">
+              <span aria-hidden="true">↗</span>
+              <h3>A fresh start.</h3>
+              <p>
+                Your chart grows as readings arrive. Connect your inverter and
+                allow at least two readings, around five minutes apart.
+              </p>
+            </div>
+          </div>
+          <p class="chart-note">
+            Readings are collected every five minutes. Gaps in the chart
+            represent missing data; earlier cloud history is not imported.
+          </p>
+        </section>
+        <section class="cost-section">
+          <div>
+            <p class="eyebrow">POUNDS &amp; POWER</p>
+            <h2>The cost of your energy.</h2>
+            <p>Time-of-use rates, applied to your measured grid usage.</p>
+          </div>
+          <div class="cost-table">
+            <div class="cost-table-head">
+              <span>BREAKDOWN</span><span>ENERGY</span
+              ><span>COST / CREDIT</span>
+            </div>
+            <div>
+              <span>Peak import</span><span id="peak-energy">—</span
+              ><strong id="peak-cost">—</strong>
+            </div>
+            <div>
+              <span>Off-peak import</span><span id="offpeak-energy">—</span
+              ><strong id="offpeak-cost">—</strong>
+            </div>
+            <div>
+              <span>Grid export</span><span id="export-energy">—</span
+              ><strong id="export-credit">—</strong>
+            </div>
+            <div>
+              <span>Standing charge <small>Full calendar days</small></span
+              ><span id="standing-days">—</span
+              ><strong id="standing-cost">—</strong>
+            </div>
+            <div class="total-row">
+              <span>Estimated net cost</span><span></span
+              ><strong id="net-cost-table">—</strong>
+            </div>
+            <p id="tariff-note">
+              Add your tariff in Settings to calculate costs.
+            </p>
+          </div>
+        </section>
+        <footer>
+          <span>solar / <strong>A little closer to your energy.</strong></span
+          ><span id="collector-status"
+            >FoxESS Cloud · five-minute collection</span
+          >
+        </footer>
+      </main>
+    </div>
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">MAKE IT YOURS</p>
+          <h2 id="settings-title">Household settings</h2>
+        </div>
+        <button
+          id="settings-close"
+          class="close-button"
+          aria-label="Close settings"
+        >
+          ×
+        </button>
+      </div>
+      <section class="settings-section">
+        <h3>01 / FoxESS connection</h3>
+        <p>
+          Your API key stays on your server. Create a key in the
+          <a
+            href="https://developer-eu.foxesscloud.com/apiKeys"
+            target="_blank"
+            rel="noopener noreferrer"
+            >FoxESS developer portal ↗</a
+          >.
+        </p>
+        <form id="connection-form">
+          <label for="api-key">FoxESS API key</label
+          ><input
+            id="api-key"
+            type="password"
+            autocomplete="off"
+            placeholder="Paste your API key"
+          /><small id="key-state">No key saved.</small
+          ><label for="device">Inverter</label
+          ><select id="device">
+            <option value="">Discover devices using API key</option></select
+          ><button class="primary" type="submit">Save connection</button>
+          <p id="connection-message" role="status"></p>
+        </form>
+      </section>
+      <section class="settings-section">
+        <h3>02 / Electricity tariff</h3>
+        <p>
+          Set rates in pence per kWh. New tariffs take effect on the date you
+          choose; saved dates cannot be overwritten.
+        </p>
+        <form id="tariff-form">
+          <div class="form-grid">
+            <label
+              >Effective from<input
+                name="effective_from"
+                type="date"
+                required /></label
+            ><label
+              >Time zone<select name="timezone">
+                <option value="Europe/London">Europe/London</option>
+              </select></label
+            ><label
+              >Peak import <span>p/kWh</span
+              ><input
+                name="peak_rate"
+                type="number"
+                min="0"
+                step="0.001"
+                required /></label
+            ><label
+              >Off-peak import <span>p/kWh</span
+              ><input
+                name="offpeak_rate"
+                type="number"
+                min="0"
+                step="0.001"
+                required /></label
+            ><label
+              >Off-peak starts<input
+                name="offpeak_start"
+                type="time"
+                required /></label
+            ><label
+              >Off-peak ends<input
+                name="offpeak_end"
+                type="time"
+                required /></label
+            ><label
+              >Export <span>p/kWh</span
+              ><input
+                name="export_rate"
+                type="number"
+                min="0"
+                step="0.001"
+                value="0"
+                required /></label
+            ><label
+              >Standing charge <span>p/day</span
+              ><input
+                name="standing_charge"
+                type="number"
+                min="0"
+                step="0.001"
+                value="0"
+                required
+            /></label>
+          </div>
+          <p class="field-hint">
+            Times follow the selected time zone, including daylight saving.
+            Off-peak windows can cross midnight.
+          </p>
+          <button class="primary" type="submit">Save tariff</button>
+          <p id="tariff-message" role="status"></p>
+        </form>
+        <h4>Tariff history</h4>
+        <div id="tariff-history" class="tariff-history">
+          No tariffs saved yet.
+        </div>
+      </section>
+    </dialog>
+  </body>
+</html>
