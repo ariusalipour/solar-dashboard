@@ -554,8 +554,14 @@ function renderDashboard(data) {
   text("net-cost", pounds(hasIntervals ? c.net_cost : null));
   text("import-total", kwh(energyValue(c.import_kwh)));
   text("export-total", kwh(energyValue(c.export_kwh)));
-  text("peak-energy", kwh(energyValue(c.peak_kwh)));
-  text("offpeak-energy", kwh(energyValue(c.offpeak_kwh)));
+  text(
+    "peak-energy",
+    kwh(finite(c.peak_cost) ? energyValue(c.peak_kwh) : null),
+  );
+  text(
+    "offpeak-energy",
+    kwh(finite(c.offpeak_cost) ? energyValue(c.offpeak_kwh) : null),
+  );
   text("export-energy", kwh(energyValue(c.export_kwh)));
   text("peak-cost", pounds(hasIntervals ? c.peak_cost : null));
   text("offpeak-cost", pounds(hasIntervals ? c.offpeak_cost : null));
