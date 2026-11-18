@@ -21,7 +21,7 @@ from .foxess import FoxClient, FoxError, parse_time, utc_string
 from .store import Store
 from .tariffs import calculate_costs, validate_tariff
 
-STATIC = Path(__file__).parent / 'static'
+WEB = Path(__file__).parent / 'web'
 LOCAL_ZONE = ZoneInfo('Europe/London')
 
 
@@ -274,11 +274,17 @@ def create_app(store=None, collect=True):
                 'calls_today': store.call_count(utc_string(datetime.now(timezone.utc) - timedelta(hours=24))),
                 'tariff_configured': bool(store.tariffs())}
 
-    app.mount('/static', StaticFiles(directory=STATIC), name='static')
+    app.mount('/assets', StaticFiles(directory=WEB / 'assets', check_dir=False), name='assets')
+
+    @app.get('/theme-init.js')
+    def theme_init():
+        return FileResponse(WEB / 'theme-init.js', headers={'Cache-Control': 'no-cache'})
 
     @app.get('/')
     def index():
-        return FileResponse(STATIC / 'index.html')
+        if not (WEB / 'index.html').is_file():
+            return JSONResponse({'detail': 'Build the dashboard with npm ci and npm run build before starting the server.'}, status_code=503)
+        return FileResponse(WEB / 'index.html', headers={'Cache-Control': 'no-cache'})
 
     return app
 

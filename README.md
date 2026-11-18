@@ -2,6 +2,8 @@
 
 A private home energy dashboard for the official FoxESS Cloud Open API. Runs as a single container with a persistent SQLite database. Public source; private credentials, readings, and tariff configuration.
 
+The interface uses React 19 and the [Astryx Neutral design system](https://github.com/meta/astryx), with locally bundled components and Figtree fonts. Vite builds versioned static assets; FastAPI serves them from the same container. Node is needed only while building the image, not in the running container. Bundled dependency notices ship at `/assets/licenses.md`.
+
 ## What it does
 
 - Solar, household, grid and battery power with the inverter's measurement timestamp.
@@ -55,18 +57,23 @@ The collector polls every five minutes (288 scheduled calls/day), with a persist
 
 ## Local development
 
-Python 3.13 recommended:
+Python 3.13 and Node 22.12+ recommended. Build the frontend before starting FastAPI:
 
 ```sh
 python -m venv .venv
 # Activate the environment for your shell, then:
 python -m pip install -r requirements-dev.txt
+npm ci
+npm run build
+npm test
 python -m pytest -q
 # Local-only development, never set SOLAR_DEV in a deployed container:
 SOLAR_DEV=true SOLAR_PUBLIC_ORIGIN=http://127.0.0.1:3050 uvicorn app.main:app --host 127.0.0.1 --port 3050
 ```
 
 PowerShell equivalent for development: `$env:SOLAR_DEV='true'`, then run `.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 3050`. The origin defaults to that local URL.
+
+For frontend hot reload, run `npm run dev` alongside FastAPI. Set `SOLAR_PUBLIC_ORIGIN` to the Vite origin shown in your terminal (normally `http://127.0.0.1:5173`) so mutation origin checks accept the development UI. Vite proxies `/api` locally. Rebuild with `npm run build` to test the production static bundle and content security policy. Generated `app/web/` and `node_modules/` are ignored by Git; commit the source and lockfile.
 
 ## Operations
 

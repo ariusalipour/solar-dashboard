@@ -7,3 +7,5 @@ data/
 *.sqlite*
 *.log
 playwright-report/
+node_modules/
+app/web/

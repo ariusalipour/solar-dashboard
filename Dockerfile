@@ -1,9 +1,18 @@
+FROM node:22-slim AS frontend
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY vite.config.js ./
+COPY frontend ./frontend
+RUN npm run build
+
 FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SOLAR_DATA_DIR=/data
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --create-home solar && mkdir /data && chown solar:solar /data
 COPY app ./app
+COPY --from=frontend /build/app/web ./app/web
 USER solar
 EXPOSE 3050
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3050/api/health', timeout=3)"

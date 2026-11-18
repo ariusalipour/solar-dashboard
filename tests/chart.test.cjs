@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const chart = require("../app/static/chart.js");
+let chart;
+test.before(async () => { chart = await import("../frontend/src/chart.js"); });
 const fields = [
   { key: "pvPower", label: "Solar" },
   { key: "batChargePower", label: "Battery charge" },
