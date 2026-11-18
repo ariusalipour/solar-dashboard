@@ -1271,7 +1271,9 @@ input[readonly] {
 .login-card h1 {
   font-size: 21px;
 }
-.login-card > p {
+.login-card > p,
+#password-signin > p,
+#access-signin > p {
   font-size: 12px;
   margin: 8px 0 24px;
   line-height: 1.7;

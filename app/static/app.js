@@ -11,6 +11,7 @@ const state = {
   editing: null,
   page: "overview",
   authenticated: false,
+  authMode: "password",
   chartIndex: null,
 };
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
@@ -76,17 +77,23 @@ function busy(form, value) {
 async function api(url, body, method = "POST") {
   const response = await fetch(url, {
     credentials: "same-origin",
+    headers: { "X-Requested-With": "XMLHttpRequest" },
     ...(body === undefined
       ? {}
       : {
           method,
           headers: {
+            "X-Requested-With": "XMLHttpRequest",
             "Content-Type": "application/json",
             "X-Solar-Request": "1",
           },
           body: JSON.stringify(body),
         }),
   });
+  if (response.status === 401 && url !== "/api/login") {
+    showLogin();
+    throw new Error("Your session has expired. Sign in again to continue.");
+  }
   let data;
   try {
     data = await response.json();
@@ -107,6 +114,10 @@ async function api(url, body, method = "POST") {
 }
 function showLogin() {
   state.authenticated = false;
+  const access = state.authMode === "cloudflare";
+  $("password-signin").hidden = access;
+  $("access-signin").hidden = !access;
+  $("password").disabled = access;
   $("login-view").hidden = false;
   $("app-view").hidden = true;
 }
@@ -858,7 +869,11 @@ $("login-form").addEventListener("submit", async (event) => {
 });
 $("logout").addEventListener("click", async () => {
   try {
-    await api("/api/logout", {});
+    const result = await api("/api/logout", {});
+    if (state.authMode === "cloudflare") {
+      location.assign("/cdn-cgi/access/logout");
+      return;
+    }
     showLogin();
     $("password").focus();
   } catch (error) {
@@ -980,6 +995,10 @@ $("range-form").addEventListener("submit", (event) => {
   $("range-end").max = today;
   try {
     const session = await api("/api/session");
+    state.authMode = session.auth_mode || "password";
+    if (state.authMode === "cloudflare") {
+      $("logout").title = "Sign out of Cloudflare Access";
+    }
     if (!session.authenticated) {
       showLogin();
       return;

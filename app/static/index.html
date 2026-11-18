@@ -76,17 +76,26 @@
         <div class="login-brand">
           <svg class="icon"><use href="#i-sun" /></svg> Solar
         </div>
-        <h1>Sign in</h1>
-        <p>Enter the household password to access your energy data.</p>
-        <label for="password">Household password</label
-        ><input
-          id="password"
-          type="password"
-          autocomplete="current-password"
-          required
-        />
+        <div id="password-signin">
+          <h1>Sign in</h1>
+          <p>Enter the household password to access your energy data.</p>
+          <label for="password">Household password</label
+          ><input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+          <button class="button primary full" type="submit">Sign in</button>
+        </div>
+        <div id="access-signin" hidden>
+          <h1>Session expired</h1>
+          <p>Sign in with Cloudflare Access to continue.</p>
+          <a class="button primary full" href="/cdn-cgi/access/login"
+            >Continue with Cloudflare Access</a
+          >
+        </div>
         <p id="login-error" class="form-message" role="alert"></p>
-        <button class="button primary full" type="submit">Sign in</button>
       </form>
     </section>
 

@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .auth import AccessVerifier
 from .energy import build_intervals, coverage_seconds
 from .foxess import FoxClient, FoxError, parse_time, utc_string
 from .store import Store
@@ -29,6 +30,8 @@ def create_app(store=None, collect=True):
     password = os.environ.get('SOLAR_PASSWORD', '')
     signing_key = (os.environ.get('SOLAR_SESSION_SECRET') or secrets.token_hex(32)) + password
     dev = os.environ.get('SOLAR_DEV') == 'true'
+    auth_mode = os.environ.get('SOLAR_AUTH_MODE', 'password')
+    verifier = None
     origin = os.environ.get('SOLAR_PUBLIC_ORIGIN', 'http://127.0.0.1:3050').rstrip('/')
     client = FoxClient(store)
     failures = {}
@@ -63,7 +66,12 @@ def create_app(store=None, collect=True):
 
     @asynccontextmanager
     async def lifespan(app):
-        if not password and not dev:
+        nonlocal verifier
+        if auth_mode not in ('password', 'cloudflare'):
+            raise RuntimeError('SOLAR_AUTH_MODE must be password or cloudflare.')
+        if auth_mode == 'cloudflare':
+            verifier = AccessVerifier(os.environ.get('SOLAR_CF_TEAM_DOMAIN', ''), os.environ.get('SOLAR_CF_AUD', ''))
+        elif not password and not dev:
             raise RuntimeError('Set SOLAR_PASSWORD (or SOLAR_DEV=true for local development only).')
         task = asyncio.create_task(collector()) if collect else None
         yield
@@ -77,7 +85,12 @@ def create_app(store=None, collect=True):
     app = FastAPI(title='Solar / home energy', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store = store
 
-    def authenticated(request):
+    async def authenticated(request):
+        if auth_mode == 'cloudflare':
+            # Health endpoints do not require keys; all identity decisions fail
+            # closed before a verifier is configured by application startup.
+            return bool(verifier) and await asyncio.to_thread(
+                verifier.authenticated, request.headers.get('cf-access-jwt-assertion', ''))
         if dev and not password:
             return True
         cookie = request.cookies.get('solar_session', '')
@@ -91,8 +104,9 @@ def create_app(store=None, collect=True):
     @app.middleware('http')
     async def security(request, call_next):
         if request.url.path.startswith('/api/') and request.url.path not in ('/api/health', '/api/session', '/api/login'):
-            if not authenticated(request):
-                return JSONResponse({'detail': 'Sign in to continue.'}, status_code=401)
+            if not await authenticated(request):
+                detail = 'Cloudflare Access session expired. Sign in again.' if auth_mode == 'cloudflare' else 'Sign in to continue.'
+                return JSONResponse({'detail': detail}, status_code=401, headers={'Cache-Control': 'no-store'})
         if request.method in ('POST', 'PUT', 'DELETE'):
             # Custom header and same-origin checks prevent cross-site requests,
             # including hostile pages attempting to reach a local development server.
@@ -129,11 +143,16 @@ def create_app(store=None, collect=True):
         return JSONResponse({'detail': 'Provide valid JSON.'}, status_code=422)
 
     @app.get('/api/session')
-    def session(request: Request):
-        return {'authenticated': authenticated(request)}
+    async def session(request: Request):
+        result = {'authenticated': await authenticated(request)}
+        if auth_mode == 'cloudflare':
+            result.update(auth_mode='cloudflare', login_url='/cdn-cgi/access/login', logout_url='/cdn-cgi/access/logout')
+        return result
 
     @app.post('/api/login')
     async def login(request: Request):
+        if auth_mode == 'cloudflare':
+            raise HTTPException(409, 'Sign in with Cloudflare Access.')
         ip = request.client.host if request.client else 'unknown'
         now = time.monotonic()
         # Never trust user-supplied forwarding headers for the throttle key.
@@ -155,6 +174,8 @@ def create_app(store=None, collect=True):
     @app.post('/api/logout')
     def logout():
         response = JSONResponse({'authenticated': False})
+        if auth_mode == 'cloudflare':
+            response = JSONResponse({'authenticated': False, 'logout_url': '/cdn-cgi/access/logout'})
         response.delete_cookie('solar_session')
         return response
 

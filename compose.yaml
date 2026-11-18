@@ -16,8 +16,11 @@ services:
     environment:
       SOLAR_DATA_DIR: /data
       SOLAR_PUBLIC_ORIGIN: ${SOLAR_PUBLIC_ORIGIN:-https://solar.mockachino.app}
-      SOLAR_PASSWORD: ${SOLAR_PASSWORD:?Set a private dashboard password in .env}
-      SOLAR_SESSION_SECRET: ${SOLAR_SESSION_SECRET:?Set a random session secret in .env}
+      SOLAR_AUTH_MODE: ${SOLAR_AUTH_MODE:-password}
+      SOLAR_CF_TEAM_DOMAIN: ${SOLAR_CF_TEAM_DOMAIN:-}
+      SOLAR_CF_AUD: ${SOLAR_CF_AUD:-}
+      SOLAR_PASSWORD: ${SOLAR_PASSWORD:-}
+      SOLAR_SESSION_SECRET: ${SOLAR_SESSION_SECRET:-}
     read_only: true
     tmpfs:
       - /tmp:size=16m,noexec,nosuid

@@ -10,7 +10,7 @@ A private home energy dashboard for the official FoxESS Cloud Open API. Runs as 
 - Effective-dated tariffs: adding a rate change preserves earlier pricing. Start dates are unique. Edit an existing tariff to correct a mistake; historical cost estimates are recalculated and the previous version is retained in the database audit history.
 - Overnight schedules and UK daylight-saving time (`Europe/London`).
 - Separate import cost, export credit, standing charge and net cost, with explicit data coverage.
-- Password-protected household access, secure session cookies on HTTPS, same-origin request protection, and server-side cloud credentials.
+- Cloudflare Access sign-in with verified identity tokens, or password-protected access for standalone deployments. Same-origin request protection and server-side cloud credentials.
 - Light, dark and system themes, remembered per browser and applied before the page renders. The Theme selector is available in navigation and on the sign-in screen.
 
 ## Using the dashboard
@@ -21,7 +21,9 @@ A private home energy dashboard for the official FoxESS Cloud Open API. Runs as 
 
 ## Run in Docker
 
-Requires Docker Compose. Copy `.env.example` to `.env` and set a long unique `SOLAR_PASSWORD` and random `SOLAR_SESSION_SECRET`. Never commit `.env` or `data/`.
+Requires Docker Compose. Copy `.env.example` to `.env`. For standalone password access, set a long unique `SOLAR_PASSWORD` and random `SOLAR_SESSION_SECRET`. Never commit `.env` or `data/`.
+
+For Cloudflare Tunnel plus Access, set `SOLAR_AUTH_MODE=cloudflare`, `SOLAR_CF_TEAM_DOMAIN` to your exact HTTPS Access team domain (for example `https://your-team.cloudflareaccess.com`), and `SOLAR_CF_AUD` to the Access application's audience tag. The app verifies the signed `Cf-Access-Jwt-Assertion` against Cloudflare's public keys, issuer, audience and expiry. After Cloudflare sign-in, the dashboard opens directly. No household password is required or accepted in this mode. Keep the Access policy restricted to your household. **Sign out** uses Cloudflare Access logout, which also ends your Access session for other applications.
 
 ```sh
 mkdir -p data
@@ -33,7 +35,7 @@ docker compose up -d --build
 
 The port binds to **127.0.0.1:3050**. Put HTTPS and private access in front of it (for example Cloudflare Tunnel plus Access). Set `SOLAR_PUBLIC_ORIGIN` to the exact HTTPS origin. Do not expose the container port directly. For local HTTP use set that variable to `http://127.0.0.1:3050` so cookies are usable.
 
-Sign in using the configured household password. Open **Connection**, enter a FoxESS API key and discover/select your inverter. Add your rates and schedule under **Electricity tariff**. You do not need to provide your FoxESS password to this application. The API key is stored in the private SQLite volume and is never returned to the browser. It is not encrypted at rest: protect the NAS volume and its backups as credentials.
+Sign in through Cloudflare Access, or use the configured household password for standalone deployments. Open **Connection**, enter a FoxESS API key and discover/select your inverter. Add your rates and schedule under **Electricity tariff**. You do not need to provide your FoxESS password to this application. The API key is stored in the private SQLite volume and is never returned to the browser. It is not encrypted at rest: protect the NAS volume and its backups as credentials.
 
 Obtain a key at the [FoxESS developer portal](https://developer-eu.foxesscloud.com/apiKeys). See the [official Open API documentation](https://www.foxesscloud.com/public/i18n/en/OpenApiDocument.html).
 
@@ -69,7 +71,7 @@ PowerShell equivalent for development: `$env:SOLAR_DEV='true'`, then run `.\.ven
 - `GET /api/health` is a deliberately minimal unauthenticated container health probe.
 - Use a single Uvicorn worker: the collector and throttle are per process.
 - Back up the complete private `data/` directory with SQLite's backup API or while the container is stopped. A live file copy of just the `.sqlite3` file can miss WAL transactions.
-- Rotate the household password or session secret in `.env`, then recreate the container; this invalidates existing sessions.
+- In password mode, rotate the household password or session secret in `.env`, then recreate the container to invalidate sessions. In Cloudflare mode, manage household access and session revocation in Cloudflare Access.
 - `docker compose logs --tail=50` contains access/status logs, never intentionally logs cloud keys or response bodies.
 - To upgrade, update the checkout and run `docker compose up -d --build`. Preserve `.env` and `data/`.
 
