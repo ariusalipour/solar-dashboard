@@ -261,6 +261,17 @@ export default function PowerChart({ data, onCompareRequest, onRangeChange }) {
           label="Chart view"
           value={mode}
           onChange={(next) => {
+            // Changing the reporting range can remount the chart immediately.
+            try {
+              localStorage.setItem(
+                "solar-chart",
+                JSON.stringify({
+                  mode: next,
+                  series: [...visible],
+                  compareMetric,
+                }),
+              );
+            } catch {}
             setMode(next);
             setPosition(null);
             if (next === "compare" && data.start === data.end)
